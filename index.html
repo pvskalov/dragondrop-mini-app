@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Подключение шрифта Inter от Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- ВАЖНО: Подключение Telegram WebApp SDK с кэш-бастером -->
-    <script src="https://telegram.org/js/telegram-web-app.js?v=202507021645"></script> <!-- Добавил v=YYYYMMDDHHMM для обхода кэша -->
     <style>
         /* Основные стили для тела страницы */
         body {
@@ -86,6 +84,30 @@
             background-color: #e5e7eb; /* gray-200 */
         }
     </style>
+    <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
+    <script>
+        const telegramWebAppScript = document.createElement('script');
+        // Используем Date.now() для создания уникального параметра версии, чтобы обойти кэш
+        telegramWebAppScript.src = `https://telegram.org/js/telegram-web-app.js?v=${Date.now()}`;
+        document.head.appendChild(telegramWebAppScript);
+
+        telegramWebAppScript.onload = () => {
+            if (window.Telegram && window.Telegram.WebApp) {
+                Telegram.WebApp.ready(); // Сигнализируем, что приложение готово
+                console.log("Telegram WebApp is ready.");
+
+                if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
+                    const telegramUser = Telegram.WebApp.initDataUnsafe.user;
+                    console.log("Telegram User Data (after ready):", telegramUser);
+                    window.telegramUserData = telegramUser; // Сохраняем данные пользователя глобально
+                } else {
+                    console.warn("Telegram WebApp user data not available after ready(). initDataUnsafe:", Telegram.WebApp.initDataUnsafe ? Telegram.WebApp.initDataUnsafe : "Telegram.WebApp.initDataUnsafe is null/undefined");
+                }
+            } else {
+                console.warn("Telegram WebApp object not found after script load.");
+            }
+        };
+    </script>
     <!-- Firebase SDKs -->
     <script type="module">
         // Импортируем нужные части Firebase SDK
@@ -759,7 +781,7 @@
                                 <p class="text-center text-gray-500">Загрузка заказов...</p>
                             </div>
                             <div class="mt-8 text-center text-gray-500">
-                                <p>Здесь будут отображаться ваши реальные заказы из базы данных.</p>
+                                <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
                             </div>
                         </div>
                     `;
@@ -793,15 +815,16 @@
                 console.log("Telegram WebApp initDataUnsafe:", window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp.initDataUnsafe : "not available or Telegram.WebApp not initialized");
 
                 // Проверяем, доступны ли данные Telegram WebApp
-                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-                    const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
-                    let displayName = 'Пользователь Telegram'; // Заглушка по умолчанию
+                // Используем window.telegramUserData, которое должно быть установлено после загрузки скрипта Telegram WebApp
+                if (window.telegramUserData) {
+                    const telegramUser = window.telegramUserData;
+                    let displayName = 'Пользователь'; // Заглушка по умолчанию
 
-                    console.log("Telegram User Data:", telegramUser);
+                    console.log("Rendering Settings: Telegram User Data:", telegramUser);
 
                     // Формируем имя для отображения
                     if (telegramUser.username) {
-                        displayName = `@${telegramUser.username}`;
+                        displayName = `@${telegramUser.username}`; // Приоритет для никнейма
                     } else if (telegramUser.first_name && telegramUser.last_name) {
                         displayName = `${telegramUser.first_name} ${telegramUser.last_name}`;
                     } else if (telegramUser.first_name) {
@@ -813,8 +836,6 @@
                     }
 
                     // Устанавливаем аватарку, если она доступна
-                    // Telegram Mini Apps могут не всегда предоставлять photo_url напрямую
-                    // Если photo_url есть, используем ее. Иначе - заглушка.
                     if (profileAvatarElement) {
                         if (telegramUser.photo_url) {
                             profileAvatarElement.src = telegramUser.photo_url;
@@ -826,8 +847,8 @@
                         }
                     }
                 } else {
-                    // Если данные Telegram WebApp недоступны
-                    console.warn("Telegram WebApp user data not available. Using default profile info.");
+                    // Если данные Telegram WebApp недоступны, используем заглушки
+                    console.warn("Rendering Settings: Telegram user data not available from global storage. Using default.");
                     if (profileNameElement) {
                         profileNameElement.textContent = "Гость"; // Как на твоем скрине
                     }
