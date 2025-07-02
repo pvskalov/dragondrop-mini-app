@@ -290,14 +290,16 @@
         // Переменная для хранения выбранного товара и его параметров
         let selectedProduct = null;
 
-        // --- URL-ы твоего сервера Timeweb ---
-        // Заменены на реальный IP-адрес и порт твоего сервера.
-        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'http://93.183.80.79:3000/fetch-poizon-product';
-        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'http://93.183.80.79:3000/track-dobropost-parcel';
+        // --- URL-ы твоего сервера Timeweb через HTTPS ---
+        // Обновлены на твой домен dragondropofficial.ru с HTTPS.
+        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'https://dragondropofficial.ru/fetch-poizon-product';
+        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'https://dragondropofficial.ru/track-dobropost-parcel';
 
         // Эта функция нужна для calculateCostProductDetails и orderConfirmation
         // Вынесена сюда, чтобы была доступна глобально до ее использования
         function calculateFullPrice(basePriceYuan) {
+            // Эта функция теперь не используется для расчета цен, так как цены приходят с сервера.
+            // Она оставлена как заглушка, если вдруг понадобится локальный расчет.
             const yuanToRubRate = 12.5; // Примерный курс юаня к рублю (будет заменен на динамический из Firebase Function)
             const dragonDropCommissionRate = 0.10; // 10% комиссия DragonDrop
             const fixedCommission = 500; // Фиксированная комиссия в рублях
@@ -416,7 +418,7 @@
                                 <div class="flex items-center justify-between">
                                     <h3 class="font-semibold text-lg">Лукбук 2025</h3>
                                     <span class="text-blue-500 text-sm cursor-pointer">Все ></span>
-                                </div>
+                                    </div>
                                 <div class="grid grid-cols-3 gap-2 mt-4">
                                     <img src="https://placehold.co/100x100/E0BBE4/FFFFFF?text=Образ1" alt="Образ 1" class="rounded-lg w-full h-auto object-cover">
                                     <img src="https://placehold.co/100x100/957DAD/FFFFFF?text=Образ2" alt="Образ 2" class="rounded-lg w-full h-auto object-cover">
@@ -662,8 +664,21 @@
                     }
 
                     // Используем estimatedPriceRub и estimatedDuty, полученные от Firebase Function
-                    const price29_35 = product.estimatedPriceRub;
-                    const price17_21 = product.estimatedPriceRub + 1000; // Пример: ускоренная доставка дороже на 1000 руб
+                    // Добавлена проверка на существование estimatedPriceRub, если нет - используем заглушку
+                    const price29_35 = product.estimatedPriceRub ? product.estimatedPriceRub : 10924;
+                    const price17_21 = product.estimatedPriceRub ? product.estimatedPriceRub + 1000 : 11924; // Пример: ускоренная доставка дороже на 1000 руб
+
+                    // Используем реальные данные или заглушки, если данные не пришли
+                    const imageUrl = product.imageUrl || "https://placehold.co/250x250/CCCCCC/FFFFFF?text=Изображение+не+найдено";
+                    const productName = product.name || "Название не найдено";
+                    const availableSizesHtml = product.availableSizes && product.availableSizes.length > 0
+                        ? product.availableSizes.map(size => `
+                            <button class="size-button ${size === product.selectedSize ? 'selected' : ''}" data-size="${size}">
+                                ${size}
+                            </button>
+                        `).join('')
+                        : '<p class="text-gray-500">Размеры не найдены</p>';
+
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -673,9 +688,9 @@
                                 </button>
                             </div>
                             <div class="flex flex-col items-center mb-6">
-                                <img src="${product.imageUrl}" alt="${product.name}" class="w-full max-w-xs rounded-lg shadow-md mb-4">
+                                <img src="${imageUrl}" alt="${productName}" class="w-full max-w-xs rounded-lg shadow-md mb-4">
                                 <p class="text-sm text-green-600 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
-                                <h2 class="text-xl font-bold text-center mb-2">${product.name}</h2>
+                                <h2 class="text-xl font-bold text-center mb-2">${productName}</h2>
                                 <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-600 mb-4">
                                     <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь</span>
                                     <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь для спорта</span>
@@ -699,7 +714,7 @@
                                 <div class="w-full max-w-xs mb-6">
                                     <p class="text-gray-700 text-sm font-bold mb-2">EU</p>
                                     <div id="size-selection" class="flex flex-wrap gap-2">
-                                        <!-- Кнопки размеров будут добавлены JavaScript'ом -->
+                                        ${availableSizesHtml}
                                     </div>
                                 </div>
 
@@ -709,7 +724,7 @@
                                         <p class="text-sm text-blue-600">29-35 дней</p>
                                     </div>
                                     <div class="bg-blue-100 p-3 rounded-xl text-center">
-                                        <p class="text-xl font-bold text-blue-700">${price17_21.toFixed(0)} ₽</p>
+                                        <p class="text-xl font-bold text-blue-700">${(price17_21).toFixed(0)} ₽</p>
                                         <p class="text-sm text-blue-600">17-21 день</p>
                                     </div>
                                 </div>
@@ -738,7 +753,19 @@
                     }
 
                     // Используем estimatedPriceRub от Firebase Function
-                    const orderPrice = orderProduct.estimatedPriceRub;
+                    const orderPrice = orderProduct.estimatedPriceRub ? orderProduct.estimatedPriceRub : 10924; // Заглушка, если нет данных
+
+                    // Используем реальные данные или заглушки, если данные не пришли
+                    const orderImageUrl = orderProduct.imageUrl || "https://placehold.co/250x250/CCCCCC/FFFFFF?text=Изображение+не+найдено";
+                    const orderProductName = orderProduct.name || "Название не найдено";
+                    const orderAvailableSizesHtml = orderProduct.availableSizes && orderProduct.availableSizes.length > 0
+                        ? orderProduct.availableSizes.map(size => `
+                            <button class="size-button ${size === orderProduct.selectedSize ? 'selected' : ''}" data-size="${size}">
+                                ${size}
+                            </button>
+                        `).join('')
+                        : '<p class="text-gray-500">Размеры не найдены</p>';
+
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -748,23 +775,18 @@
                                 </button>
                             </div>
                             <div class="flex items-center mb-6">
-                                <img src="${orderProduct.imageUrl}" alt="${orderProduct.name}" class="w-24 h-24 rounded-lg mr-4 shadow-md">
+                                <img src="${orderImageUrl}" alt="${orderProductName}" class="w-24 h-24 rounded-lg mr-4 shadow-md">
                                 <div>
-                                    <h2 class="text-lg font-bold">${orderProduct.name}</h2>
+                                    <h2 class="text-lg font-bold">${orderProductName}</h2>
                                     <p class="text-sm text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
-                                    <p class="text-gray-600 text-sm">Размер: EU ${orderProduct.selectedSize}</p>
+                                    <p class="text-gray-600 text-sm">Размер: EU ${orderProduct.selectedSize || 'Не выбран'}</p>
                                 </div>
                             </div>
 
                             <div class="w-full mb-6">
                                 <p class="text-gray-700 text-sm font-bold mb-2">EU</p>
                                 <div class="flex flex-wrap gap-2">
-                                    <!-- Кнопки размеров, как на предыдущей странице, но уже с выбранным -->
-                                    ${orderProduct.availableSizes.map(size => `
-                                        <button class="size-button ${size === orderProduct.selectedSize ? 'selected' : ''}" data-size="${size}">
-                                            ${size}
-                                        </button>
-                                    `).join('')}
+                                    ${orderAvailableSizesHtml}
                                 </div>
                             </div>
 
@@ -906,6 +928,7 @@
                     showLoading('Собираем данные с Poizon...'); // Показываем загрузку
 
                     try {
+                        console.log(`Отправка запроса на ${FETCH_POIZON_PRODUCT_FUNCTION_URL} с ссылкой: ${poizonLink}`);
                         const response = await fetch(FETCH_POIZON_PRODUCT_FUNCTION_URL, {
                             method: 'POST',
                             headers: {
@@ -914,7 +937,18 @@
                             body: JSON.stringify({ link: poizonLink }),
                         });
 
+                        console.log("Получен ответ от сервера. Статус:", response.status);
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`Ошибка HTTP: ${response.status} - ${errorText}`);
+                            showMessage(`Ошибка сервера: ${response.status}. Подробности в консоли.`);
+                            hideLoading();
+                            return;
+                        }
+
                         const result = await response.json();
+                        console.log("Парсинг JSON ответа сервера:", result);
                         hideLoading(); // Скрываем загрузку
 
                         if (result.success) {
@@ -923,17 +957,22 @@
                             if (selectedProduct.availableSizes && selectedProduct.availableSizes.length > 0) {
                                 selectedProduct.selectedSize = selectedProduct.availableSizes[0];
                             } else {
-                                selectedProduct.selectedSize = 'Без размера';
+                                selectedProduct.selectedSize = 'Без размера'; // Если размеров нет, указываем это
                             }
+                            console.log("Данные товара успешно получены:", selectedProduct);
                             renderPage('calculateCostProductDetails');
                         } else {
                             showMessage(result.message || 'Ошибка при получении данных с Poizon.');
-                            console.error('Ошибка сервера:', result.error);
+                            console.error('Ошибка сервера (ответ success: false):', result.error);
+                            // Если success: false, но нет specific error, выводим весь result
+                            if (!result.error) {
+                                console.error('Полный ответ сервера при success: false:', result);
+                            }
                         }
                     } catch (error) {
                         hideLoading(); // Скрываем загрузку
-                        showMessage('Произошла сетевая ошибка при запросе данных.');
-                        console.error('Сетевая ошибка:', error);
+                        showMessage('Произошла сетевая ошибка при запросе данных. Проверьте консоль.');
+                        console.error('Сетевая ошибка или ошибка парсинга JSON:', error);
                     }
                 });
             }
@@ -1003,7 +1042,7 @@
                             deliveryAddress: 'Сергиев Посад, Кооперативная ул, д.20',
                             recipientName: 'Андрей Паскалов',
                             recipientPhone: '+7 (910) 776 11 86',
-                            estimatedDuty: selectedProduct.estimatedDuty // Добавляем пошлину
+                            estimatedDuty: selectedProduct.estimatedDuty
                         };
                         console.log("Данные заказа для сохранения:", orderData);
 
@@ -1077,13 +1116,13 @@
                         console.log("Загружен заказ:", orderId, order);
                         ordersListDiv.innerHTML += `
                             <div class="bg-white p-4 rounded-xl shadow-sm flex items-center space-x-4">
-                                <img src="${order.productImageUrl}" alt="${order.productName}" class="w-20 h-20 rounded-lg object-cover">
+                                <img src="${order.productImageUrl || 'https://placehold.co/80x80/CCCCCC/FFFFFF?text=Нет+фото'}" alt="${order.productName}" class="w-20 h-20 rounded-lg object-cover">
                                 <div class="flex-grow">
-                                    <p class="font-semibold text-lg">${order.productName}</p>
-                                    <p class="text-gray-600 text-sm">Размер: EU ${order.selectedSize}</p>
-                                    <p class="text-gray-600 text-sm">Статус: <span class="font-medium text-blue-600">${order.status}</span></p>
-                                    <p class="text-gray-800 font-bold mt-1">${order.totalPriceRub.toFixed(0)} ₽</p>
-                                    <p class="text-gray-500 text-xs">Заказ от: ${new Date(order.orderDate).toLocaleDateString('ru-RU')}</p>
+                                    <p class="font-semibold text-lg">${order.productName || 'Название не указано'}</p>
+                                    <p class="text-gray-600 text-sm">Размер: EU ${order.selectedSize || 'Не выбран'}</p>
+                                    <p class="text-gray-600 text-sm">Статус: <span class="font-medium text-blue-600">${order.status || 'Неизвестно'}</span></p>
+                                    <p class="text-gray-800 font-bold mt-1">${order.totalPriceRub ? order.totalPriceRub.toFixed(0) : '0'} ₽</p>
+                                    <p class="text-gray-500 text-xs">Заказ от: ${order.orderDate ? new Date(order.orderDate).toLocaleDateString('ru-RU') : 'Неизвестно'}</p>
                                     <p class="text-gray-500 text-xs">ID заказа: ${orderId}</p>
                                 </div>
                             </div>
