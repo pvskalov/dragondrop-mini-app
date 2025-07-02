@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Подключение шрифта Inter от Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- ВАЖНО: Подключение Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         /* Основные стили для тела страницы */
         body {
@@ -786,10 +788,15 @@
                 const profileNameElement = document.getElementById('profile-name');
                 const profileAvatarElement = document.getElementById('profile-avatar');
 
+                console.log("Telegram WebApp object:", window.Telegram);
+                console.log("Telegram WebApp initDataUnsafe:", window.Telegram ? window.Telegram.WebApp.initDataUnsafe : "not available");
+
                 // Проверяем, доступны ли данные Telegram WebApp
                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
                     const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
                     let displayName = 'Пользователь Telegram'; // Заглушка по умолчанию
+
+                    console.log("Telegram User Data:", telegramUser);
 
                     // Формируем имя для отображения
                     if (telegramUser.username) {
@@ -821,7 +828,7 @@
                     // Если данные Telegram WebApp недоступны
                     console.warn("Telegram WebApp user data not available. Using default profile info.");
                     if (profileNameElement) {
-                        profileNameElement.textContent = "Гость"; // Или "Андрей" как в макете
+                        profileNameElement.textContent = "Андрей"; // Или "Гость"
                     }
                     if (profileAvatarElement) {
                         profileAvatarElement.src = "https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей"; // Заглушка
