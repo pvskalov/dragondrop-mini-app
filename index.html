@@ -822,14 +822,15 @@
 
                     console.log("Rendering Settings: Telegram User Data:", telegramUser);
 
-                    // Формируем имя для отображения
-                    if (telegramUser.username) {
-                        displayName = `@${telegramUser.username}`; // Приоритет для никнейма
-                    } else if (telegramUser.first_name && telegramUser.last_name) {
+                    // --- ИЗМЕНЕНА ЛОГИКА ПРИОРИТЕТА ОТОБРАЖЕНИЯ ИМЕНИ ---
+                    if (telegramUser.first_name && telegramUser.last_name) {
                         displayName = `${telegramUser.first_name} ${telegramUser.last_name}`;
                     } else if (telegramUser.first_name) {
                         displayName = telegramUser.first_name;
+                    } else if (telegramUser.username) {
+                        displayName = `@${telegramUser.username}`;
                     }
+                    // ----------------------------------------------------
 
                     if (profileNameElement) {
                         profileNameElement.textContent = displayName;
