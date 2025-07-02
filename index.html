@@ -459,15 +459,11 @@
                             <div class="flex flex-col items-center py-6">
                                 <img id="profile-avatar" src="https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей" alt="Фото профиля" class="w-24 h-24 rounded-full object-cover mb-4 shadow-md">
                                 <h2 id="profile-name" class="text-2xl font-bold mb-6">Загрузка...</h2>
-                                <p class="text-gray-600 text-sm mb-4">Ваш ID: <span id="display-user-id" class="font-semibold">Загрузка...</span></p>
+                                <!-- Удалил строку с ID пользователя -->
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <div class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm">
-                                    <i class="fas fa-smile text-blue-500 mr-3 text-lg"></i>
-                                    <span class="flex-grow">Установить DRAGONDROP эмодзи</span>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </div>
+                                <!-- Удалил блок "Установить DRAGONDROP эмодзи" -->
                                 <div class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm">
                                     <i class="fas fa-plus-circle text-blue-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Добавить на экран «Домой»</span>
@@ -798,14 +794,15 @@
             // Логика для конкретных страниц после их рендеринга
             if (pageName === 'settings') {
                 // Отображаем ID пользователя, как только он будет доступен
-                const displayUserIdElement = document.getElementById('display-user-id');
-                if (displayUserIdElement) {
-                    if (window.currentUserId) {
-                        displayUserIdElement.textContent = window.currentUserId;
-                    } else {
-                        displayUserIdElement.textContent = 'Недоступен';
-                    }
-                }
+                // Удалил логику отображения ID, так как элемент был удален из HTML
+                // const displayUserIdElement = document.getElementById('display-user-id');
+                // if (displayUserIdElement) {
+                //     if (window.currentUserId) {
+                //         displayUserIdElement.textContent = window.currentUserId;
+                //     } else {
+                //         displayUserIdElement.textContent = 'Недоступен';
+                //     }
+                // }
 
                 // Логика для отображения имени и аватарки пользователя Telegram
                 const profileNameElement = document.getElementById('profile-name');
@@ -828,7 +825,7 @@
                     } else if (telegramUser.first_name) {
                         displayName = telegramUser.first_name;
                     } else if (telegramUser.username) {
-                        displayName = `@${telegramUser.username}`;
+                        displayName = `@${telegramUser.username}`; // Используем никнейм только если нет имени/фамилии
                     }
                     // ----------------------------------------------------
 
