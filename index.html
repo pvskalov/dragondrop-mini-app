@@ -114,10 +114,21 @@
 
         // Функция для инициализации Firebase и аутентификации пользователя
         async function initFirebase() {
+            console.log("Firebase: Инициализация Firebase...");
+            console.log("Firebase Config:", firebaseConfig); // Логируем конфигурацию, чтобы проверить ее
+
+            // Проверка на полноту конфигурации
+            if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+                console.error("Firebase: Неполная или некорректная конфигурация Firebase.");
+                showMessage('Ошибка: Неполная конфигурация Firebase. Проверьте настройки.');
+                return; // Останавливаем инициализацию, если конфигурация неверна
+            }
+
             try {
                 window.firebaseApp = initializeApp(firebaseConfig); // Инициализируем приложение Firebase
                 window.db = getFirestore(window.firebaseApp);       // Получаем доступ к базе данных Firestore
                 window.auth = getAuth(window.firebaseApp);           // Получаем доступ к модулю аутентификации
+                console.log("Firebase: Приложение и сервисы инициализированы.");
 
                 // Слушаем изменения состояния аутентификации (когда пользователь входит/выходит)
                 onAuthStateChanged(window.auth, async (user) => {
@@ -127,14 +138,30 @@
                         console.log("Firebase: Пользователь вошел в систему. UID:", user.uid);
                     } else {
                         // Пользователь вышел из системы или еще не вошел
-                        console.log("Firebase: Пользователь не вошел в систему.");
-                        // Если нет специального токена от Telegram, входим анонимно
-                        if (!window.__initial_auth_token) {
-                            await signInAnonymously(window.auth); // Анонимный вход
-                            console.log("Firebase: Выполнен анонимный вход.");
+                        console.log("Firebase: Пользователь не вошел в систему. Попытка аутентификации...");
+
+                        // Если среда Canvas предоставляет начальный токен аутентификации, пробуем его
+                        if (window.__initial_auth_token) {
+                            console.log("Firebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
+                            try {
+                                await signInWithCustomToken(window.auth, window.__initial_auth_token);
+                                console.log("Firebase: Вход с пользовательским токеном выполнен.");
+                            } catch (customTokenError) {
+                                console.error("Firebase: Ошибка входа с пользовательским токеном:", customTokenError);
+                                // Если вход по токену не удался, пробуем анонимный вход
+                                console.log("Firebase: Вход с пользовательским токеном не удался, попытка анонимного входа...");
+                                await signInAnonymously(window.auth);
+                                console.log("Firebase: Выполнен анонимный вход после неудачи с пользовательским токеном.");
+                            }
+                        } else {
+                            // Если токена нет, сразу выполняем анонимный вход
+                            console.log("Firebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
+                            await signInAnonymously(window.auth);
                         }
                     }
                     window.isFirebaseReady = true; // Устанавливаем флаг, что Firebase готов к работе
+                    console.log("Firebase: isFirebaseReady установлен в true. Текущий UID:", window.currentUserId);
+
                     // После того, как Firebase инициализирован и пользователь аутентифицирован,
                     // можно безопасно рендерить домашнюю страницу.
                     // Это предотвращает ошибки, когда приложение пытается работать с базой данных
@@ -145,14 +172,6 @@
                         renderPage('home');
                     }
                 });
-
-                // Если среда Canvas предоставляет начальный токен аутентификации, используем его
-                if (window.__initial_auth_token) {
-                    await signInWithCustomToken(window.auth, window.__initial_auth_token);
-                    console.log("Firebase: Вход с пользовательским токеном.");
-                } else {
-                    // Если токена нет, onAuthStateChanged (выше) позаботится об анонимном входе
-                }
 
             } catch (error) {
                 console.error("Ошибка инициализации Firebase или аутентификации:", error);
@@ -824,9 +843,13 @@
             // Добавляем обработчик для кнопки "Заказать" на странице orderConfirmation
             if (pageName === 'orderConfirmation') {
                 document.getElementById('place-order-btn').addEventListener('click', async () => {
+                    console.log("Попытка оформить заказ...");
+                    console.log("Firebase Ready:", window.isFirebaseReady, "Current User ID:", window.currentUserId);
+
                     // Проверяем, что Firebase готов и пользователь аутентифицирован
                     if (!window.isFirebaseReady || !window.currentUserId) {
                         showMessage('Приложение загружается или нет пользователя. Пожалуйста, подождите.');
+                        console.error('Ошибка: Firebase не готов или нет UID пользователя.');
                         return;
                     }
 
@@ -846,6 +869,7 @@
                             recipientName: 'Андрей Паскалов',
                             recipientPhone: '+7 (910) 776 11 86'
                         };
+                        console.log("Данные заказа для сохранения:", orderData);
 
                         // Сохраняем заказ в коллекцию 'orders' для данного пользователя
                         // Путь к коллекции: /artifacts/{appId}/users/{userId}/orders
@@ -853,6 +877,8 @@
                             window.db,
                             `artifacts/${appId}/users/${window.currentUserId}/orders`
                         );
+                        console.log("Путь к коллекции Firestore:", `artifacts/${appId}/users/${window.currentUserId}/orders`);
+
                         await window.firestore.addDoc(ordersCollectionRef, orderData);
 
                         showMessage('Заказ успешно оформлен и сохранен!');
@@ -888,6 +914,7 @@
                 // Проверяем, что Firebase готов и пользователь аутентифицирован
                 if (!window.isFirebaseReady || !window.currentUserId) {
                     ordersListDiv.innerHTML = '<p class="text-center text-red-500">Не удалось загрузить заказы. Пользователь не аутентифицирован.</p>';
+                    console.error('Ошибка: Firebase не готов или нет UID пользователя при загрузке заказов.');
                     return;
                 }
 
@@ -896,11 +923,14 @@
                     window.db,
                     `artifacts/${appId}/users/${window.currentUserId}/orders`
                 );
+                console.log("Попытка загрузить заказы из:", `artifacts/${appId}/users/${window.currentUserId}/orders`);
+
 
                 // Слушаем изменения в коллекции заказов в реальном времени
                 window.firestore.onSnapshot(userOrdersCollectionRef, (snapshot) => {
                     if (snapshot.empty) {
                         ordersListDiv.innerHTML = '<p class="text-center text-gray-500">У вас пока нет заказов.</p>';
+                        console.log("Заказов не найдено.");
                         return;
                     }
 
@@ -908,6 +938,7 @@
                     snapshot.forEach(doc => {
                         const order = doc.data();
                         const orderId = doc.id; // ID документа заказа
+                        console.log("Загружен заказ:", orderId, order);
                         ordersListDiv.innerHTML += `
                             <div class="bg-white p-4 rounded-xl shadow-sm flex items-center space-x-4">
                                 <img src="${order.productImageUrl}" alt="${order.productName}" class="w-20 h-20 rounded-lg object-cover">
