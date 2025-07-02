@@ -432,8 +432,8 @@
                                 </button>
                             </div>
                             <div class="flex flex-col items-center py-6">
-                                <img src="https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей" alt="Фото профиля" class="w-24 h-24 rounded-full object-cover mb-4 shadow-md">
-                                <h2 class="text-2xl font-bold mb-6">Andrey</h2>
+                                <img id="profile-avatar" src="https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей" alt="Фото профиля" class="w-24 h-24 rounded-full object-cover mb-4 shadow-md">
+                                <h2 id="profile-name" class="text-2xl font-bold mb-6">Загрузка...</h2>
                                 <p class="text-gray-600 text-sm mb-4">Ваш ID: <span id="display-user-id" class="font-semibold">Загрузка...</span></p>
                             </div>
 
@@ -779,6 +779,53 @@
                         displayUserIdElement.textContent = window.currentUserId;
                     } else {
                         displayUserIdElement.textContent = 'Недоступен';
+                    }
+                }
+
+                // Логика для отображения имени и аватарки пользователя Telegram
+                const profileNameElement = document.getElementById('profile-name');
+                const profileAvatarElement = document.getElementById('profile-avatar');
+
+                // Проверяем, доступны ли данные Telegram WebApp
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                    const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
+                    let displayName = 'Пользователь Telegram'; // Заглушка по умолчанию
+
+                    // Формируем имя для отображения
+                    if (telegramUser.username) {
+                        displayName = `@${telegramUser.username}`;
+                    } else if (telegramUser.first_name && telegramUser.last_name) {
+                        displayName = `${telegramUser.first_name} ${telegramUser.last_name}`;
+                    } else if (telegramUser.first_name) {
+                        displayName = telegramUser.first_name;
+                    }
+
+                    if (profileNameElement) {
+                        profileNameElement.textContent = displayName;
+                    }
+
+                    // Устанавливаем аватарку, если она доступна
+                    // Telegram Mini Apps могут не всегда предоставлять photo_url напрямую
+                    // Если photo_url есть, используем ее. Иначе - заглушка.
+                    if (profileAvatarElement) {
+                        if (telegramUser.photo_url) {
+                            profileAvatarElement.src = telegramUser.photo_url;
+                            profileAvatarElement.alt = `Аватар ${displayName}`;
+                        } else {
+                            // Заглушка, если аватарка не найдена
+                            profileAvatarElement.src = "https://placehold.co/100x100/A0D9B1/FFFFFF?text=TG";
+                            profileAvatarElement.alt = "Аватар Telegram";
+                        }
+                    }
+                } else {
+                    // Если данные Telegram WebApp недоступны
+                    console.warn("Telegram WebApp user data not available. Using default profile info.");
+                    if (profileNameElement) {
+                        profileNameElement.textContent = "Гость"; // Или "Андрей" как в макете
+                    }
+                    if (profileAvatarElement) {
+                        profileAvatarElement.src = "https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей"; // Заглушка
+                        profileAvatarElement.alt = "Фото профиля по умолчанию";
                     }
                 }
             }
