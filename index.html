@@ -109,7 +109,8 @@
         };
 
         // ТВОЙ APP_ID ИЗ КОНФИГУРАЦИИ ВЫШЕ
-        const appId = "1:106217738831:web:be1b6433b3eae44ce0d03a";
+        // Делаем его глобальным, чтобы он был доступен в других скриптах
+        window.appId = "1:106217738831:web:be1b6433b3eae44ce0d03a";
 
 
         // Функция для инициализации Firebase и аутентификации пользователя
@@ -875,9 +876,9 @@
                         // Путь к коллекции: /artifacts/{appId}/users/{userId}/orders
                         const ordersCollectionRef = window.firestore.collection(
                             window.db,
-                            `artifacts/${appId}/users/${window.currentUserId}/orders`
+                            `artifacts/${window.appId}/users/${window.currentUserId}/orders` // Используем window.appId
                         );
-                        console.log("Путь к коллекции Firestore:", `artifacts/${appId}/users/${window.currentUserId}/orders`);
+                        console.log("Путь к коллекции Firestore:", `artifacts/${window.appId}/users/${window.currentUserId}/orders`); // Используем window.appId
 
                         await window.firestore.addDoc(ordersCollectionRef, orderData);
 
@@ -921,9 +922,9 @@
                 // Получаем ссылку на коллекцию заказов текущего пользователя
                 const userOrdersCollectionRef = window.firestore.collection(
                     window.db,
-                    `artifacts/${appId}/users/${window.currentUserId}/orders`
+                    `artifacts/${window.appId}/users/${window.currentUserId}/orders` // Используем window.appId
                 );
-                console.log("Попытка загрузить заказы из:", `artifacts/${appId}/users/${window.currentUserId}/orders`);
+                console.log("Попытка загрузить заказы из:", `artifacts/${window.appId}/users/${window.currentUserId}/orders`); // Используем window.appId
 
 
                 // Слушаем изменения в коллекции заказов в реальном времени
