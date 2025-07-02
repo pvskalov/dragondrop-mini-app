@@ -83,6 +83,36 @@
         .size-button:hover:not(.selected) {
             background-color: #e5e7eb; /* gray-200 */
         }
+
+        /* Стили для индикатора загрузки */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            font-size: 1.2rem;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
     <script>
@@ -219,6 +249,12 @@
     <!-- Всплывающее сообщение (для уведомлений вместо alert()) -->
     <div id="messageBox" class="message-box"></div>
 
+    <!-- Индикатор загрузки -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p>Загрузка данных...</p>
+    </div>
+
     <!-- Основная область контента приложения -->
     <div id="app-content" class="flex-grow pb-20 overflow-y-auto">
         <!-- Сюда будет загружаться содержимое страниц с помощью JavaScript -->
@@ -254,10 +290,15 @@
         // Переменная для хранения выбранного товара и его параметров
         let selectedProduct = null;
 
+        // --- URL-ы твоего сервера Timeweb ---
+        // Заменены на реальный IP-адрес и порт твоего сервера.
+        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'http://93.183.80.79:3000/fetch-poizon-product';
+        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'http://93.183.80.79:3000/track-dobropost-parcel';
+
         // Эта функция нужна для calculateCostProductDetails и orderConfirmation
         // Вынесена сюда, чтобы была доступна глобально до ее использования
         function calculateFullPrice(basePriceYuan) {
-            const yuanToRubRate = 12.5; // Примерный курс юаня к рублю
+            const yuanToRubRate = 12.5; // Примерный курс юаня к рублю (будет заменен на динамический из Firebase Function)
             const dragonDropCommissionRate = 0.10; // 10% комиссия DragonDrop
             const fixedCommission = 500; // Фиксированная комиссия в рублях
             const chinaDelivery = 50; // Примерная стоимость доставки по Китаю в юанях
@@ -281,6 +322,18 @@
             setTimeout(() => {
                 messageBox.classList.remove('show');
             }, duration);
+        }
+
+        // Функция для показа/скрытия индикатора загрузки
+        function showLoading(message = 'Загрузка данных...') {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.querySelector('p').textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.classList.add('hidden');
         }
 
         // Функция для отображения содержимого страницы
@@ -459,11 +512,9 @@
                             <div class="flex flex-col items-center py-6">
                                 <img id="profile-avatar" src="https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей" alt="Фото профиля" class="w-24 h-24 rounded-full object-cover mb-4 shadow-md">
                                 <h2 id="profile-name" class="text-2xl font-bold mb-6">Загрузка...</h2>
-                                <!-- Удалил строку с ID пользователя -->
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <!-- Удалил блок "Установить DRAGONDROP эмодзи" -->
                                 <div class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm">
                                     <i class="fas fa-plus-circle text-blue-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Добавить на экран «Домой»</span>
@@ -603,19 +654,16 @@
 
                 case 'calculateCostProductDetails':
                     headerTitle = 'Расчет стоимости';
-                    // Здесь мы будем использовать данные из selectedProduct
                     const product = selectedProduct;
                     if (!product) {
-                        // Если данных нет, возвращаемся на предыдущий шаг или показываем ошибку
                         showMessage('Ошибка: данные о товаре не найдены. Попробуйте снова.');
                         renderPage('calculateCostInputLink');
                         return;
                     }
 
-                    // Моделирование расчета для выбранного товара
-                    // Функцию calculateFullPrice теперь можно вызывать, так как она определена выше
-                    const price29_35 = calculateFullPrice(product.priceYuan); // Используем базовую цену для расчета
-                    const price17_21 = calculateFullPrice(product.priceYuan + 100); // Пример: ускоренная доставка дороже на 100 юаней
+                    // Используем estimatedPriceRub и estimatedDuty, полученные от Firebase Function
+                    const price29_35 = product.estimatedPriceRub;
+                    const price17_21 = product.estimatedPriceRub + 1000; // Пример: ускоренная доставка дороже на 1000 руб
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -661,7 +709,7 @@
                                         <p class="text-sm text-blue-600">29-35 дней</p>
                                     </div>
                                     <div class="bg-blue-100 p-3 rounded-xl text-center">
-                                        <p class="text-xl font-bold text-blue-700">${(price29_35 + 1000).toFixed(0)} ₽</p> <!-- Примерная цена для ускоренной -->
+                                        <p class="text-xl font-bold text-blue-700">${price17_21.toFixed(0)} ₽</p>
                                         <p class="text-sm text-blue-600">17-21 день</p>
                                     </div>
                                 </div>
@@ -689,8 +737,8 @@
                         return;
                     }
 
-                    // Моделирование расчета для выбранного товара (повторно, если нужно обновить)
-                    const orderPrice = calculateFullPrice(orderProduct.priceYuan); // Используем функцию из calculateCostProductDetails
+                    // Используем estimatedPriceRub от Firebase Function
+                    const orderPrice = orderProduct.estimatedPriceRub;
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -793,17 +841,6 @@
 
             // Логика для конкретных страниц после их рендеринга
             if (pageName === 'settings') {
-                // Отображаем ID пользователя, как только он будет доступен
-                // Удалил логику отображения ID, так как элемент был удален из HTML
-                // const displayUserIdElement = document.getElementById('display-user-id');
-                // if (displayUserIdElement) {
-                //     if (window.currentUserId) {
-                //         displayUserIdElement.textContent = window.currentUserId;
-                //     } else {
-                //         displayUserIdElement.textContent = 'Недоступен';
-                //     }
-                // }
-
                 // Логика для отображения имени и аватарки пользователя Telegram
                 const profileNameElement = document.getElementById('profile-name');
                 const profileAvatarElement = document.getElementById('profile-avatar');
@@ -859,22 +896,44 @@
 
             // Добавляем обработчик событий для кнопки "Далее" на странице calculateCostInputLink
             if (pageName === 'calculateCostInputLink') {
-                document.getElementById('next-step-btn').addEventListener('click', () => {
+                document.getElementById('next-step-btn').addEventListener('click', async () => {
                     const poizonLink = document.getElementById('poizon-link-input').value.trim();
-                    // Простая проверка ссылки. В реальном приложении здесь была бы сложная логика парсинга/API
-                    if (poizonLink.includes('dw4.co/t/A/1sSPQhtQg')) {
-                        // Симулируем получение данных для конкретной ссылки
-                        selectedProduct = {
-                            name: 'New Balance 530 "White Silver Navy"',
-                            imageUrl: 'https://placehold.co/300x300/E0E0E0/333333?text=New+Balance+530', // Заглушка изображения
-                            priceYuan: 550, // Примерная цена в юанях
-                            availableSizes: ['36', '37', '37.5', '38', '38.5', '39', '39.5', '40', '40.5', '41', '42'],
-                            selectedSize: '37.5' // Размер по умолчанию
-                        };
-                        renderPage('calculateCostProductDetails');
-                    } else {
-                        showMessage('Извините, сейчас мы можем обработать только тестовую ссылку: https://dw4.co/t/A/1sSPQhtQg');
-                        // В реальном приложении здесь будет запрос к бэкенду для парсинга любой ссылки
+                    if (!poizonLink) {
+                        showMessage('Пожалуйста, вставьте ссылку на товар Poizon.');
+                        return;
+                    }
+
+                    showLoading('Собираем данные с Poizon...'); // Показываем загрузку
+
+                    try {
+                        const response = await fetch(FETCH_POIZON_PRODUCT_FUNCTION_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ link: poizonLink }),
+                        });
+
+                        const result = await response.json();
+                        hideLoading(); // Скрываем загрузку
+
+                        if (result.success) {
+                            selectedProduct = { ...result.product, originalLink: poizonLink };
+                            // Устанавливаем размер по умолчанию, если он есть
+                            if (selectedProduct.availableSizes && selectedProduct.availableSizes.length > 0) {
+                                selectedProduct.selectedSize = selectedProduct.availableSizes[0];
+                            } else {
+                                selectedProduct.selectedSize = 'Без размера';
+                            }
+                            renderPage('calculateCostProductDetails');
+                        } else {
+                            showMessage(result.message || 'Ошибка при получении данных с Poizon.');
+                            console.error('Ошибка сервера:', result.error);
+                        }
+                    } catch (error) {
+                        hideLoading(); // Скрываем загрузку
+                        showMessage('Произошла сетевая ошибка при запросе данных.');
+                        console.error('Сетевая ошибка:', error);
                     }
                 });
             }
@@ -883,6 +942,7 @@
             if (pageName === 'calculateCostProductDetails') {
                 const sizeSelectionDiv = document.getElementById('size-selection');
                 if (sizeSelectionDiv && selectedProduct && selectedProduct.availableSizes) {
+                    sizeSelectionDiv.innerHTML = ''; // Очищаем, чтобы избежать дублирования
                     selectedProduct.availableSizes.forEach(size => {
                         const button = document.createElement('button');
                         button.textContent = size;
@@ -897,7 +957,6 @@
                             // Выделяем текущую кнопку
                             button.classList.add('selected');
                             selectedProduct.selectedSize = size; // Обновляем выбранный размер
-                            // В реальном приложении здесь может быть пересчет цены, если цена зависит от размера
                             showMessage(`Выбран размер: EU ${size}`);
                         });
                         sizeSelectionDiv.appendChild(button);
@@ -934,15 +993,17 @@
                             userId: window.currentUserId, // ID текущего пользователя
                             productName: selectedProduct.name,
                             productImageUrl: selectedProduct.imageUrl,
+                            productOriginalLink: selectedProduct.originalLink, // Сохраняем оригинальную ссылку
                             selectedSize: selectedProduct.selectedSize,
                             priceYuan: selectedProduct.priceYuan,
-                            totalPriceRub: calculateFullPrice(selectedProduct.priceYuan),
+                            totalPriceRub: selectedProduct.estimatedPriceRub, // Используем цену, рассчитанную функцией
                             orderDate: new Date().toISOString(), // Дата и время заказа
                             status: 'В обработке', // Начальный статус заказа
                             deliveryMethod: 'В магазине', // Пока по умолчанию, можно добавить выбор
                             deliveryAddress: 'Сергиев Посад, Кооперативная ул, д.20',
                             recipientName: 'Андрей Паскалов',
-                            recipientPhone: '+7 (910) 776 11 86'
+                            recipientPhone: '+7 (910) 776 11 86',
+                            estimatedDuty: selectedProduct.estimatedDuty // Добавляем пошлину
                         };
                         console.log("Данные заказа для сохранения:", orderData);
 
