@@ -149,7 +149,7 @@
         window.firebaseApp = null; // Само приложение Firebase
         window.db = null;           // База данных Firestore
         window.auth = null;         // Модуль аутентификации
-        window.currentUserId = null; // ID текущего пользователя
+        window.currentUserId = null; // ID текущего пользователя (будет Telegram ID или Firebase UID)
         window.isFirebaseReady = false; // Флаг готовности Firebase
 
         // ТВОЯ КОНФИГУРАЦИЯ FIREBASE, КОТОРУЮ ТЫ СКОПИРОВАЛ ИЗ КОНСОЛИ FIREBASE
@@ -164,8 +164,7 @@
 
         // ТВОЙ APP_ID ИЗ КОНФИГУРАЦИИ ВЫШЕ
         // Делаем его глобальным, чтобы он был доступен в других скриптах
-        window.appId = "1:106217738831:web:be1b6433b3eae44ce0d03a";
-
+        window.appId = "dragondropapp-9e6a6"; // Используем projectId как appId для Firestore пути
 
         // Функция для инициализации Firebase и аутентификации пользователя
         async function initFirebase() {
@@ -187,40 +186,49 @@
 
                 // Слушаем изменения состояния аутентификации (когда пользователь входит/выходит)
                 onAuthStateChanged(window.auth, async (user) => {
-                    if (user) {
-                        // Пользователь вошел в систему
-                        window.currentUserId = user.uid; // Сохраняем его уникальный ID
-                        console.log("Firebase: Пользователь вошел в систему. UID:", user.uid);
-                    } else {
-                        // Пользователь вышел из системы или еще не вошел
-                        console.log("Firebase: Пользователь не вошел в систему. Попытка аутентификации...");
+                    let determinedUserId = null;
 
-                        // Если среда Canvas предоставляет начальный токен аутентификации, пробуем его
-                        if (window.__initial_auth_token) {
-                            console.log("Firebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
-                            try {
+                    // 1. Попытка получить ID из Telegram WebApp
+                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                        determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
+                        console.log("Firebase: UID определен как Telegram User ID:", determinedUserId);
+                    } else if (user) {
+                        // 2. Если Telegram ID недоступен, используем UID от Firebase Auth
+                        determinedUserId = user.uid;
+                        console.log("Firebase: UID определен как Firebase Auth UID:", determinedUserId);
+                    } else {
+                        // 3. Если ни Telegram ID, ни Firebase Auth UID нет, пробуем анонимный вход
+                        console.log("Firebase: Пользователь не вошел в систему. Попытка аутентификации...");
+                        try {
+                             if (window.__initial_auth_token) {
+                                console.log("Firebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
                                 await signInWithCustomToken(window.auth, window.__initial_auth_token);
                                 console.log("Firebase: Вход с пользовательским токеном выполнен.");
-                            } catch (customTokenError) {
-                                console.error("Firebase: Ошибка входа с пользовательским токеном:", customTokenError);
-                                // Если вход по токену не удался, пробуем анонимный вход
-                                console.log("Firebase: Вход с пользовательским токеном не удался, попытка анонимного входа...");
+                            } else {
+                                console.log("Firebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
                                 await signInAnonymously(window.auth);
-                                console.log("Firebase: Выполнен анонимный вход после неудачи с пользовательским токеном.");
                             }
-                        } else {
-                            // Если токена нет, сразу выполняем анонимный вход
-                            console.log("Firebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
-                            await signInAnonymously(window.auth);
+                            // После успешного входа, user будет доступен в следующем onAuthStateChanged
+                            // Или сразу возьмем его UID, если он уже есть
+                            if (window.auth.currentUser) {
+                                determinedUserId = window.auth.currentUser.uid;
+                                console.log("Firebase: UID определен после входа:", determinedUserId);
+                            }
+                        } catch (authError) {
+                            console.error("Firebase: Ошибка аутентификации (custom token или анонимный):", authError);
+                            // Если все попытки входа не удались, генерируем случайный ID для текущей сессии
+                            determinedUserId = 'anonymous_' + Math.random().toString(36).substring(2, 15);
+                            console.warn("Firebase: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
+                            showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
                         }
                     }
+
+                    window.currentUserId = determinedUserId; // Устанавливаем глобальный ID пользователя
                     window.isFirebaseReady = true; // Устанавливаем флаг, что Firebase готов к работе
-                    console.log("Firebase: isFirebaseReady установлен в true. Текущий UID:", window.currentUserId);
+                    console.log("Firebase: isFirebaseReady установлен в true. Текущий UID для Firestore:", window.currentUserId);
 
                     // После того, как Firebase инициализирован и пользователь аутентифицирован,
                     // можно безопасно рендерить домашнюю страницу.
-                    // Это предотвращает ошибки, когда приложение пытается работать с базой данных
-                    // до того, как пользователь вошел в систему.
                     if (document.readyState === 'loading') { // Если DOM еще загружается
                         document.addEventListener('DOMContentLoaded', () => renderPage('home'));
                     } else {
@@ -292,8 +300,8 @@
 
         // --- URL-ы твоего сервера Timeweb через HTTPS ---
         // Обновлены на твой домен dragondropofficial.ru с HTTPS.
-        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'https://dragondropofficial.ru/fetch-poizon-product';
-        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'https://dragondropofficial.ru/track-dobropost-parcel';
+        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'http://localhost:3000/fetch-poizon-product';
+        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'http://localhost:3000/track-dobropost-parcel';
 
         // Эта функция нужна для calculateCostProductDetails и orderConfirmation
         // Вынесена сюда, чтобы была доступна глобально до ее использования
@@ -397,10 +405,11 @@
                                     <p class="text-sm font-medium">Баллы</p>
                                     <p class="text-3xl font-bold">₽ 50</p>
                                 </div>
+                                <!-- ИЗМЕНЕНИЕ ЗДЕСЬ: УБРАНА КНОПКА, КОТОРАЯ ЗАКРЫВАЛА ВЕСЬ БЛОК -->
+                                <!-- Теперь этот блок просто информационный, не кликабельный -->
                                 <div class="bg-blue-500 text-white p-4 rounded-xl flex flex-col justify-between items-end text-right shadow-md">
                                     <p class="text-sm font-medium">Выбрать и заказать</p>
                                     <i class="fas fa-arrow-right text-3xl mt-2"></i>
-                                    <button class="absolute inset-0 w-full h-full" onclick="renderPage('calculateCostInfo')"></button>
                                 </div>
                             </div>
 
@@ -724,7 +733,7 @@
                                         <p class="text-sm text-blue-600">29-35 дней</p>
                                     </div>
                                     <div class="bg-blue-100 p-3 rounded-xl text-center">
-                                        <p class="text-xl font-bold text-blue-700">${(price17_21).toFixed(0)} ₽</p>
+                                        <p class="text-xl font-bold text-blue-700">${(price17_21).toFixed(0)} ₽</p> <!-- Примерная цена для ускоренной -->
                                         <p class="text-sm text-blue-600">17-21 день</p>
                                     </div>
                                 </div>
@@ -811,7 +820,7 @@
 
                             <h3 class="text-lg font-bold mb-3">Кому выдать</h3>
                             <p class="text-gray-700 mb-2">Андрей Паскалов</p>
-                            <p class="text-gray-700 mb-4">+7 (910) 776 11 86</p>
+                            <p class="text-700 mb-4">+7 (910) 776 11 86</p>
 
                             <div class="flex justify-between gap-4 mb-6">
                                 <button class="flex-1 bg-green-100 text-green-700 py-2 rounded-xl font-semibold">+50 баллов Начислить</button>
@@ -1029,7 +1038,7 @@
                     try {
                         // Создаем объект заказа для сохранения в Firestore
                         const orderData = {
-                            userId: window.currentUserId, // ID текущего пользователя
+                            userId: window.currentUserId, // ID текущего пользователя (Telegram ID)
                             productName: selectedProduct.name,
                             productImageUrl: selectedProduct.imageUrl,
                             productOriginalLink: selectedProduct.originalLink, // Сохраняем оригинальную ссылку
@@ -1143,10 +1152,7 @@
         });
 
         // Изначальная загрузка страницы теперь происходит после инициализации Firebase
-        // document.addEventListener('DOMContentLoaded', () => {
-        //     renderPage('home');
-        // });
+        // renderPage('home'); // Убрано, так как вызывается после onAuthStateChanged
     </script>
 </body>
 </html>
-
