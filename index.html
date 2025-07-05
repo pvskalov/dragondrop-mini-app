@@ -189,14 +189,16 @@
         // Импорты Firebase SDK (теперь внутри основного скрипта)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Важно: добавлены serverTimestamp и increment в импорты Firestore
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Глобальные переменные, которые раньше были экспортированы из других файлов
+        // Глобальные переменные
         let firebaseApp = null;
         let db = null;
         let auth = null;
         let currentUserId = null;
         let isFirebaseReady = false;
+        // Объект firestore теперь включает serverTimestamp и increment
         const firestore = {
             getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, increment
         };
@@ -215,7 +217,7 @@
             appId: "1:106217738831:web:be1b6433b3eae44ce0d03a"
         };
 
-        // --- utils.js функции ---
+        // --- utils.js функции (теперь встроены) ---
         function showMessage(message, duration = 3000) {
             const messageBox = document.getElementById('messageBox');
             if (messageBox) {
@@ -248,7 +250,7 @@
             }
         }
 
-        // --- api.js функции ---
+        // --- api.js функции (теперь встроены) ---
         const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'http://localhost:3000/fetch-poizon-product';
         const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'http://localhost:3000/track-dobropost-parcel';
 
@@ -332,7 +334,7 @@
             }
         }
 
-        // --- firebase-init.js функции и переменные ---
+        // --- Firebase-related functions (теперь встроены) ---
         function generateReferralCode() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
@@ -357,7 +359,7 @@
                     const newUserProfile = {
                         balance: 0,
                         referralCode: generateReferralCode(),
-                        createdAt: firestore.serverTimestamp(),
+                        createdAt: firestore.serverTimestamp(), // Использование serverTimestamp
                         invitedBy: invitedByCode || null,
                         hasMadeFirstOrder: false
                     };
@@ -387,12 +389,13 @@
             const userDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}`);
             try {
                 await firestore.updateDoc(userDocRef, {
-                    balance: firestore.increment(amount)
+                    balance: firestore.increment(amount) // Использование increment
                 });
+                // Обновляем локальный профиль, чтобы UI сразу отразил изменения
                 if (currentUserProfile && currentUserProfile.referralCode === userId) {
                     currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
-                } else if (currentUserProfile && currentUserProfile.userId === userId) {
-                    currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
+                } else if (currentUserProfile && currentUserId === userId) { // Используем currentUserId для прямого совпадения
+                     currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
                 }
                 showMessage(`Баланс обновлен на ${amount} ₽.`);
                 console.log(`Баланс пользователя ${userId} обновлен на ${amount}.`);
@@ -470,7 +473,7 @@
             });
         }
 
-        // --- main.js функции и логика ---
+        // --- main.js функции и логика (теперь встроены) ---
         function calculateFullPrice(basePriceYuan) {
             const yuanToRubRate = 12.5;
             const dragonDropCommissionRate = 0.10;
@@ -649,12 +652,13 @@
                                     </div>
                                 </div>
                             `;
-                            break; // Выходим из switch, чтобы не рендерить дальше
+                            break;
                         }
                     }
 
                     const referralCode = currentUserProfile.referralCode;
-                    const botUsername = 'dragondrop_poizon_bot'; // Убедись, что это имя твоего бота
+                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
+                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                     content = `
@@ -1058,7 +1062,8 @@
                 const copyReferralLinkBtn = document.getElementById('copy-referral-link-btn');
                 if (copyReferralLinkBtn) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // REPLACE WITH YOUR ACTUAL BOT USERNAME
+                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
+                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                     copyReferralLinkBtn.addEventListener('click', async () => {
@@ -1081,7 +1086,8 @@
                 const shareReferralBtn = document.getElementById('share-referral-btn');
                 if (shareReferralBtn && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.shareViaUrl) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // REPLACE WITH YOUR ACTUAL BOT USERNAME
+                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
+                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
                     const shareText = `Привет! Присоединяйся к DragonDrop и заказывай кроссовки из Poizon дешевле!\nИспользуй мой реферальный код: ${referralCode} или переходи по ссылке: ${referralLink}`;
 
