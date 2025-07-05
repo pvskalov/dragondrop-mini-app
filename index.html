@@ -1,1 +1,1152 @@
-lolila
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DragonDrop App</title>
+    <!-- Подключение Tailwind CSS для стилей -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение Font Awesome для иконок -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Подключение шрифта Inter от Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Основные стили для тела страницы */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Светло-серый фон */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Пользовательские стили для изображения утки, чтобы оно правильно масштабировалось */
+        .duck-image {
+            max-width: 150px; /* Максимальная ширина для изображения утки */
+            height: auto;
+        }
+        /* Пользовательские стили для нижней навигационной панели */
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 0;
+            color: #6b7280; /* Серый текст */
+            font-size: 0.75rem; /* text-xs */
+            transition: color 0.2s ease-in-out;
+        }
+        .bottom-nav-item.active {
+            color: #007bff; /* Синий для активного элемента */
+        }
+        .bottom-nav-item i {
+            font-size: 1.25rem; /* text-xl */
+            margin-bottom: 4px;
+        }
+        /* Скрыть полосу прокрутки для лучшего мобильного опыта */
+        body::-webkit-scrollbar {
+            display: none;
+        }
+        body {
+            -ms-overflow-style: none;  /* Для IE и Edge */
+            scrollbar-width: none;  /* Для Firefox */
+        }
+        /* Стили для всплывающего сообщения */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+        /* Стили для кнопок выбора размера */
+        .size-button {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb; /* gray-200 */
+            background-color: #f9fafb; /* gray-50 */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .size-button.selected {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border-color: #3b82f6;
+        }
+        .size-button:hover:not(.selected) {
+            background-color: #e5e7eb; /* gray-200 */
+        }
+
+        /* Стили для индикатора загрузки */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            font-size: 1.2rem;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
+    <script>
+        const telegramWebAppScript = document.createElement('script');
+        // Используем Date.now() для создания уникального параметра версии, чтобы обойти кэш
+        telegramWebAppScript.src = `https://telegram.org/js/telegram-web-app.js?v=${Date.now()}`;
+        document.head.appendChild(telegramWebAppScript);
+
+        telegramWebAppScript.onload = () => {
+            if (window.Telegram && window.Telegram.WebApp) {
+                Telegram.WebApp.ready(); // Сигнализируем, что приложение готово
+                console.log("Telegram WebApp is ready.");
+
+                if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
+                    const telegramUser = Telegram.WebApp.initDataUnsafe.user;
+                    console.log("Telegram User Data (after ready):", telegramUser);
+                    window.telegramUserData = telegramUser; // Сохраняем данные пользователя глобально
+                } else {
+                    console.warn("Telegram WebApp user data not available after ready(). initDataUnsafe:", Telegram.WebApp.initDataUnsafe ? Telegram.WebApp.initDataUnsafe : "Telegram.WebApp.initDataUnsafe is null/undefined");
+                }
+            } else {
+                console.warn("Telegram WebApp object not found after script load.");
+            }
+        };
+    </script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Импортируем нужные части Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Глобальные переменные Firebase, которые будут доступны в основном скрипте
+        window.firebaseApp = null; // Само приложение Firebase
+        window.db = null;           // База данных Firestore
+        window.auth = null;         // Модуль аутентификации
+        window.currentUserId = null; // ID текущего пользователя
+        window.isFirebaseReady = false; // Флаг готовности Firebase
+
+        // ТВОЯ КОНФИГУРАЦИЯ FIREBASE, КОТОРУЮ ТЫ СКОПИРОВАЛ ИЗ КОНСОЛИ FIREBASE
+        const firebaseConfig = {
+          apiKey: "AIzaSyAs32uOlV5VugkioYbT-PvS-D0L-5IF_mE",
+          authDomain: "dragondropapp-9e6a6.firebaseapp.com",
+          projectId: "dragondropapp-9e6a6",
+          storageBucket: "dragondropapp-9e6a6.firebasestorage.app",
+          messagingSenderId: "106217738831",
+          appId: "1:106217738831:web:be1b6433b3eae44ce0d03a"
+        };
+
+        // ТВОЙ APP_ID ИЗ КОНФИГУРАЦИИ ВЫШЕ
+        // Делаем его глобальным, чтобы он был доступен в других скриптах
+        window.appId = "1:106217738831:web:be1b6433b3eae44ce0d03a";
+
+
+        // Функция для инициализации Firebase и аутентификации пользователя
+        async function initFirebase() {
+            console.log("Firebase: Инициализация Firebase...");
+            console.log("Firebase Config:", firebaseConfig); // Логируем конфигурацию, чтобы проверить ее
+
+            // Проверка на полноту конфигурации
+            if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+                console.error("Firebase: Неполная или некорректная конфигурация Firebase.");
+                showMessage('Ошибка: Неполная конфигурация Firebase. Проверьте настройки.');
+                return; // Останавливаем инициализацию, если конфигурация неверна
+            }
+
+            try {
+                window.firebaseApp = initializeApp(firebaseConfig); // Инициализируем приложение Firebase
+                window.db = getFirestore(window.firebaseApp);       // Получаем доступ к базе данных Firestore
+                window.auth = getAuth(window.firebaseApp);           // Получаем доступ к модулю аутентификации
+                console.log("Firebase: Приложение и сервисы инициализированы.");
+
+                // Слушаем изменения состояния аутентификации (когда пользователь входит/выходит)
+                onAuthStateChanged(window.auth, async (user) => {
+                    if (user) {
+                        // Пользователь вошел в систему
+                        window.currentUserId = user.uid; // Сохраняем его уникальный ID
+                        console.log("Firebase: Пользователь вошел в систему. UID:", user.uid);
+                    } else {
+                        // Пользователь вышел из системы или еще не вошел
+                        console.log("Firebase: Пользователь не вошел в систему. Попытка аутентификации...");
+
+                        // Если среда Canvas предоставляет начальный токен аутентификации, пробуем его
+                        if (window.__initial_auth_token) {
+                            console.log("Firebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
+                            try {
+                                await signInWithCustomToken(window.auth, window.__initial_auth_token);
+                                console.log("Firebase: Вход с пользовательским токеном выполнен.");
+                            } catch (customTokenError) {
+                                console.error("Firebase: Ошибка входа с пользовательским токеном:", customTokenError);
+                                // Если вход по токену не удался, пробуем анонимный вход
+                                console.log("Firebase: Вход с пользовательским токеном не удался, попытка анонимного входа...");
+                                await signInAnonymously(window.auth);
+                                console.log("Firebase: Выполнен анонимный вход после неудачи с пользовательским токеном.");
+                            }
+                        } else {
+                            // Если токена нет, сразу выполняем анонимный вход
+                            console.log("Firebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
+                            await signInAnonymously(window.auth);
+                        }
+                    }
+                    window.isFirebaseReady = true; // Устанавливаем флаг, что Firebase готов к работе
+                    console.log("Firebase: isFirebaseReady установлен в true. Текущий UID:", window.currentUserId);
+
+                    // После того, как Firebase инициализирован и пользователь аутентифицирован,
+                    // можно безопасно рендерить домашнюю страницу.
+                    // Это предотвращает ошибки, когда приложение пытается работать с базой данных
+                    // до того, как пользователь вошел в систему.
+                    if (document.readyState === 'loading') { // Если DOM еще загружается
+                        document.addEventListener('DOMContentLoaded', () => renderPage('home'));
+                    } else {
+                        renderPage('home');
+                    }
+                });
+
+            } catch (error) {
+                console.error("Ошибка инициализации Firebase или аутентификации:", error);
+                // Показываем сообщение об ошибке пользователю, если Firebase не инициализировался
+                showMessage('Ошибка инициализации приложения. Пожалуйста, попробуйте позже.');
+            }
+        }
+
+        // Вызываем функцию инициализации Firebase, как только скрипт загрузится
+        initFirebase();
+
+        // Делаем необходимые функции Firestore доступными глобально для основного скрипта
+        window.firestore = {
+            getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs
+        };
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Всплывающее сообщение (для уведомлений вместо alert()) -->
+    <div id="messageBox" class="message-box"></div>
+
+    <!-- Индикатор загрузки -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p>Загрузка данных...</p>
+    </div>
+
+    <!-- Основная область контента приложения -->
+    <div id="app-content" class="flex-grow pb-20 overflow-y-auto">
+        <!-- Сюда будет загружаться содержимое страниц с помощью JavaScript -->
+    </div>
+
+    <!-- Нижняя навигационная панель -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+        <div class="flex justify-around h-16 max-w-screen-md mx-auto">
+            <button class="bottom-nav-item active" data-page="home">
+                <i class="fas fa-home"></i>
+                <span>Главная</span>
+            </button>
+            <button class="bottom-nav-item" data-page="favorites">
+                <i class="fas fa-heart"></i>
+                <span>Избранное</span>
+            </button>
+            <button class="bottom-nav-item" data-page="cart">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Корзина</span>
+            </button>
+            <button class="bottom-nav-item" data-page="friends">
+                <i class="fas fa-users"></i>
+                <span>Друзья</span>
+            </button>
+            <button class="bottom-nav-item" data-page="settings">
+                <i class="fas fa-cog"></i>
+                <span>Настройки</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // Переменная для хранения выбранного товара и его параметров
+        let selectedProduct = null;
+
+        // --- URL-ы твоего сервера Timeweb через HTTPS ---
+        // Обновлены на твой домен dragondropofficial.ru с HTTPS.
+        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'https://dragondropofficial.ru/fetch-poizon-product';
+        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'https://dragondropofficial.ru/track-dobropost-parcel';
+
+        // Эта функция нужна для calculateCostProductDetails и orderConfirmation
+        // Вынесена сюда, чтобы была доступна глобально до ее использования
+        function calculateFullPrice(basePriceYuan) {
+            // Эта функция теперь не используется для расчета цен, так как цены приходят с сервера.
+            // Она оставлена как заглушка, если вдруг понадобится локальный расчет.
+            const yuanToRubRate = 12.5; // Примерный курс юаня к рублю (будет заменен на динамический из Firebase Function)
+            const dragonDropCommissionRate = 0.10; // 10% комиссия DragonDrop
+            const fixedCommission = 500; // Фиксированная комиссия в рублях
+            const chinaDelivery = 50; // Примерная стоимость доставки по Китаю в юанях
+            const internationalDeliveryPerKg = 1000; // Примерная международная доставка за кг в рублях
+            const itemWeightKg = 0.5; // Примерный вес товара в кг
+
+            const priceInRubles = basePriceYuan * yuanToRubRate;
+            const commission = Math.max(priceInRubles * dragonDropCommissionRate, fixedCommission);
+            const chinaDeliveryRubles = chinaDelivery * yuanToRubRate;
+            const internationalDeliveryRubles = internationalDeliveryPerKg * itemWeightKg;
+            const russiaDelivery = 300; // Примерная стоимость доставки по России
+            return priceInRubles + commission + chinaDeliveryRubles + internationalDeliveryRubles + russiaDelivery;
+        }
+
+        // Функция для отображения всплывающих сообщений
+        function showMessage(message, duration = 3000) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.classList.add('show');
+            // Скрыть сообщение через заданное время
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // Функция для показа/скрытия индикатора загрузки
+        function showLoading(message = 'Загрузка данных...') {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.querySelector('p').textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            loadingOverlay.classList.add('hidden');
+        }
+
+        // Функция для отображения содержимого страницы
+        async function renderPage(pageName) { // Сделали функцию асинхронной для работы с Firebase
+            const appContent = document.getElementById('app-content');
+            let content = ''; // Переменная для хранения HTML-кода страницы
+            let headerTitle = 'DragonDrop'; // Заголовок по умолчанию
+
+            // Обновляем активный элемент в нижней навигации
+            document.querySelectorAll('.bottom-nav-item').forEach(item => {
+                if (item.dataset.page === pageName) {
+                    item.classList.add('active'); // Делаем активным
+                } else {
+                    item.classList.remove('active'); // Убираем активность
+                }
+            });
+
+            // В зависимости от имени страницы, формируем ее содержимое
+            switch (pageName) {
+                case 'home':
+                    headerTitle = 'DragonDrop';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center space-x-2">
+                                    <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm">
+                                        <i class="fas fa-times mr-1"></i> Закрыть
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h1 class="text-xl font-semibold">DragonDrop</h1>
+                                <button class="px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-medium">Добавить</button>
+                            </div>
+                            <div class="mb-4">
+                                <input type="text" placeholder="Найти кроссовки" class="w-full p-3 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 mb-6">
+                                <div class="bg-yellow-100 p-3 rounded-xl flex items-center justify-center text-center flex-col shadow-sm">
+                                    <img src="https://placehold.co/80x80/FFD700/FFFFFF?text=Друзья" alt="Зови друзей" class="rounded-full mb-2">
+                                    <p class="text-sm font-medium">Зови друзей! +500₽</p>
+                                </div>
+                                <div class="bg-purple-100 p-3 rounded-xl flex items-center justify-center text-center flex-col shadow-sm">
+                                    <img src="https://placehold.co/80x80/8A2BE2/FFFFFF?text=Dragon" alt="Что умеет DragonDrop" class="rounded-full mb-2">
+                                    <p class="text-sm font-medium">Что умеет DragonDrop?</p>
+                                </div>
+                                <div class="bg-gray-100 p-3 rounded-xl flex items-center justify-center text-center flex-col shadow-sm">
+                                    <img src="https://placehold.co/80x80/A9A9A9/FFFFFF?text=Заказ" alt="3 способа заказать" class="rounded-full mb-2">
+                                    <p class="text-sm font-medium">3 способа заказать кроссовки</p>
+                                </div>
+                                <div class="bg-red-100 p-3 rounded-xl flex items-center justify-center text-center flex-col shadow-sm">
+                                    <img src="https://placehold.co/80x80/FF0000/FFFFFF?text=Скидка" alt="Заказывай сейчас" class="rounded-full mb-2">
+                                    <p class="text-sm font-medium">Заказывай сейчас плати потом 50%</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 mb-6">
+                                <div class="bg-red-500 text-white p-4 rounded-xl flex flex-col justify-between shadow-md">
+                                    <p class="text-sm font-medium">Баллы</p>
+                                    <p class="text-3xl font-bold">₽ 50</p>
+                                </div>
+                                <div class="bg-blue-500 text-white p-4 rounded-xl flex flex-col justify-between items-end text-right shadow-md">
+                                    <p class="text-sm font-medium">Выбрать и заказать</p>
+                                    <i class="fas fa-arrow-right text-3xl mt-2"></i>
+                                    <button class="absolute inset-0 w-full h-full" onclick="renderPage('calculateCostInfo')"></button>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+                                <div class="flex items-center justify-between cursor-pointer" onclick="renderPage('calculateCostInfo')">
+                                    <div class="flex items-center space-x-3">
+                                        <img src="https://placehold.co/40x40/000000/FFFFFF?text=P" alt="Poizon logo" class="rounded-full">
+                                        <p class="font-medium">Рассчитать стоимость товара из Poizon</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="font-semibold text-lg">Лукбук 2025</h3>
+                                    <span class="text-blue-500 text-sm cursor-pointer">Все ></span>
+                                    </div>
+                                <div class="grid grid-cols-3 gap-2 mt-4">
+                                    <img src="https://placehold.co/100x100/E0BBE4/FFFFFF?text=Образ1" alt="Образ 1" class="rounded-lg w-full h-auto object-cover">
+                                    <img src="https://placehold.co/100x100/957DAD/FFFFFF?text=Образ2" alt="Образ 2" class="rounded-lg w-full h-auto object-cover">
+                                    <img src="https://placehold.co/100x100/D291BC/FFFFFF?text=Образ3" alt="Образ 3" class="rounded-lg w-full h-auto object-cover">
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'favorites':
+                    headerTitle = 'Избранные товары';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('home')">
+                                    <i class="fas fa-times mr-1"></i> Закрыть
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center justify-center py-10">
+                                <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                <h2 class="text-2xl font-bold mb-2 text-center">Избранные товары</h2>
+                                <p class="text-gray-600 text-center max-w-xs">Нажимайте на сердечки рядом с товарами, чтобы быстро находить то, что вам понравилось.</p>
+                            </div>
+                            <!-- Заглушка для избранных товаров -->
+                            <div class="mt-8 text-center text-gray-500">
+                                <p>Здесь будут отображаться ваши избранные товары.</p>
+                                <p>Данные будут загружаться с бэкенда.</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'cart':
+                    headerTitle = 'Корзина';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('home')">
+                                    <i class="fas fa-times mr-1"></i> Закрыть
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center justify-center py-10">
+                                <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                <h2 class="text-2xl font-bold mb-2 text-center">Корзина</h2>
+                                <p class="text-gray-600 text-center max-w-xs">В корзине пока ничего нет. Самое время наполнить ее!</p>
+                            </div>
+                            <!-- Заглушка для товаров в корзине -->
+                            <div class="mt-8 text-center text-gray-500">
+                                <p>Здесь будут отображаться товары в вашей корзине.</p>
+                                <p>Данные будут загружаться с бэкенда.</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'friends':
+                    headerTitle = 'Приглашай друзей';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('home')">
+                                    <i class="fas fa-times mr-1"></i> Закрыть
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center justify-center py-10">
+                                <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
+                                <p class="text-gray-600 text-center max-w-xs">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
+                            </div>
+                            <div class="p-4">
+                                <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md">
+                                    Пригласить друга 500 ₽
+                                </button>
+                            </div>
+                            <div class="mt-8 text-center text-gray-500">
+                                <p>Здесь будет логика реферальной программы.</p>
+                                <p>Данные будут загружаться с бэкенда.</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'settings':
+                    headerTitle = 'Настройки';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('home')">
+                                    <i class="fas fa-times mr-1"></i> Закрыть
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center py-6">
+                                <img id="profile-avatar" src="https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей" alt="Фото профиля" class="w-24 h-24 rounded-full object-cover mb-4 shadow-md">
+                                <h2 id="profile-name" class="text-2xl font-bold mb-6">Загрузка...</h2>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-plus-circle text-blue-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Добавить на экран «Домой»</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-user text-red-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Мой профиль</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-lock text-gray-600 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Конфиденциальность</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-star text-yellow-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Статус</span>
+                                    <span class="text-gray-500 mr-2">Новичок</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-wallet text-green-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Баланс</span>
+                                    <span class="text-gray-500 mr-2">50 ₽</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-user-plus text-blue-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Пригласить друга</span>
+                                    <span class="text-gray-500 mr-2">+500 ₽</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer" onclick="renderPage('myOrders')">
+                                    <i class="fas fa-box text-red-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Заказы</span>
+                                    <span class="text-gray-500 mr-2">1</span> <!-- Это будет динамически обновляться -->
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-comment-alt text-orange-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Отзывы</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-heart text-pink-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Избранное</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-th-large text-purple-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Подборки</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                    <i class="fas fa-eye text-blue-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Просмотренные товары</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                            <div class="mt-8 text-center text-gray-500">
+                                <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'calculateCostInfo':
+                    headerTitle = 'Poizon (De Wu)';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('home')">
+                                    <i class="fas fa-chevron-left mr-1"></i> Назад
+                                </button>
+                            </div>
+                            <div class="flex items-center mb-6">
+                                <img src="https://placehold.co/60x60/000000/FFFFFF?text=得物" alt="Poizon logo" class="rounded-lg mr-4">
+                                <div>
+                                    <h2 class="text-xl font-semibold">Poizon (De Wu)</h2>
+                                    <p class="text-gray-600 text-sm">Китайский маркетплейс оригинальных брендовых товаров</p>
+                                </div>
+                            </div>
+                            <button class="w-full bg-blue-500 text-white py-2 rounded-xl text-md font-medium mb-8">
+                                Открыть в AppStore
+                            </button>
+
+                            <h3 class="text-xl font-bold mb-4">Расчет стоимости</h3>
+                            <p class="text-gray-700 mb-4">
+                                Рассчитаем стоимость заказа в маркетплейсе Poizon, включая нашу комиссию и доставку.
+                            </p>
+                            <p class="text-gray-700 mb-4">
+                                Если у тебя еще нет приложения Poizon — скачивай по кнопке выше. Там есть любые кроссовки и вещи, дешевле на 30-50% чем в РФ.
+                            </p>
+                            <p class="text-gray-700 mb-6">
+                                А если не хочешь заморачиваться — скидывай ссылку на Poizon в чат, мы тебе скинем в ответ рассчитанный товар.
+                            </p>
+                            <a href="#" class="text-blue-500 text-sm mb-auto">Как скачать и зарегистрироваться в Poizon?</a>
+
+                            <button class="w-full bg-blue-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md mt-8" onclick="renderPage('calculateCostInputLink')">
+                                Начать
+                            </button>
+                        </div>
+                    `;
+                    break;
+
+                case 'calculateCostInputLink':
+                    headerTitle = 'Ссылка на товар в Poizon';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('calculateCostInfo')">
+                                    <i class="fas fa-chevron-left mr-1"></i> Назад
+                                </button>
+                            </div>
+                            <p class="text-gray-700 mb-6">
+                                Шаг 1 из 3: Нажмите на товаре в Poizon кнопку «поделиться». Скопируйте ссылку и вставьте сюда. <a href="#" class="text-blue-500">А как это сделать?</a>
+                            </p>
+                            <div class="flex justify-center mb-8">
+                                <img src="https://placehold.co/250x150/E0BBE4/FFFFFF?text=Инструкция" alt="Инструкция по копированию ссылки" class="rounded-lg shadow-md">
+                            </div>
+                            <div class="mb-auto">
+                                <input type="url" id="poizon-link-input" placeholder="Вставьте ссылку на товар Poizon" class="w-full p-3 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            </div>
+                            <button id="next-step-btn" class="w-full bg-blue-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md mt-8">
+                                Далее
+                            </button>
+                        </div>
+                    `;
+                    break;
+
+                case 'calculateCostProductDetails':
+                    headerTitle = 'Расчет стоимости';
+                    const product = selectedProduct;
+                    if (!product) {
+                        showMessage('Ошибка: данные о товаре не найдены. Попробуйте снова.');
+                        renderPage('calculateCostInputLink');
+                        return;
+                    }
+
+                    // Используем estimatedPriceRub и estimatedDuty, полученные от Firebase Function
+                    // Добавлена проверка на существование estimatedPriceRub, если нет - используем заглушку
+                    const price29_35 = product.estimatedPriceRub ? product.estimatedPriceRub : 10924;
+                    const price17_21 = product.estimatedPriceRub ? product.estimatedPriceRub + 1000 : 11924; // Пример: ускоренная доставка дороже на 1000 руб
+
+                    // Используем реальные данные или заглушки, если данные не пришли
+                    const imageUrl = product.imageUrl || "https://placehold.co/250x250/CCCCCC/FFFFFF?text=Изображение+не+найдено";
+                    const productName = product.name || "Название не найдено";
+                    const availableSizesHtml = product.availableSizes && product.availableSizes.length > 0
+                        ? product.availableSizes.map(size => `
+                            <button class="size-button ${size === product.selectedSize ? 'selected' : ''}" data-size="${size}">
+                                ${size}
+                            </button>
+                        `).join('')
+                        : '<p class="text-gray-500">Размеры не найдены</p>';
+
+
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('calculateCostInputLink')">
+                                    <i class="fas fa-chevron-left mr-1"></i> Назад
+                                </button>
+                            </div>
+                            <div class="flex flex-col items-center mb-6">
+                                <img src="${imageUrl}" alt="${productName}" class="w-full max-w-xs rounded-lg shadow-md mb-4">
+                                <p class="text-sm text-green-600 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
+                                <h2 class="text-xl font-bold text-center mb-2">${productName}</h2>
+                                <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-600 mb-4">
+                                    <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь</span>
+                                    <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь для спорта</span>
+                                    <span class="bg-gray-100 px-2 py-1 rounded-full">Бег</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-6">
+                                    <div class="text-center">
+                                        <p class="text-gray-500 text-sm">Особенности</p>
+                                        <p class="font-medium">Амортизирующие, износостойкие</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <p class="text-gray-500 text-sm">Посадка</p>
+                                        <p class="font-medium">Унисекс</p>
+                                    </div>
+                                    <div class="col-span-2 text-center">
+                                        <p class="text-gray-500 text-sm">Сезон</p>
+                                        <p class="font-medium">Весна, лето, осень</p>
+                                    </div>
+                                </div>
+
+                                <div class="w-full max-w-xs mb-6">
+                                    <p class="text-gray-700 text-sm font-bold mb-2">EU</p>
+                                    <div id="size-selection" class="flex flex-wrap gap-2">
+                                        ${availableSizesHtml}
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4 w-full max-w-xs mb-6">
+                                    <div class="bg-blue-100 p-3 rounded-xl text-center">
+                                        <p class="text-xl font-bold text-blue-700">${price29_35.toFixed(0)} ₽</p>
+                                        <p class="text-sm text-blue-600">29-35 дней</p>
+                                    </div>
+                                    <div class="bg-blue-100 p-3 rounded-xl text-center">
+                                        <p class="text-xl font-bold text-blue-700">${(price17_21).toFixed(0)} ₽</p>
+                                        <p class="text-sm text-blue-600">17-21 день</p>
+                                    </div>
+                                </div>
+
+                                <p class="text-gray-600 text-sm text-center mb-4">
+                                    Этот товар можно вернуть, если он вам не подойдет. <a href="#" class="text-blue-500">Как вернуть товар?</a>
+                                </p>
+                                <p class="text-gray-600 text-sm text-center mb-6">
+                                    Срок указан для Москвы, по России — дольше
+                                </p>
+                            </div>
+                            <button id="buy-button" class="w-full bg-blue-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md mt-auto">
+                                Купить ${price29_35.toFixed(0)} ₽
+                            </button>
+                        </div>
+                    `;
+                    break;
+
+                case 'orderConfirmation':
+                    headerTitle = 'Оформление заказа';
+                    const orderProduct = selectedProduct;
+                    if (!orderProduct) {
+                        showMessage('Ошибка: данные о товаре для заказа не найдены.');
+                        renderPage('home');
+                        return;
+                    }
+
+                    // Используем estimatedPriceRub от Firebase Function
+                    const orderPrice = orderProduct.estimatedPriceRub ? orderProduct.estimatedPriceRub : 10924; // Заглушка, если нет данных
+
+                    // Используем реальные данные или заглушки, если данные не пришли
+                    const orderImageUrl = orderProduct.imageUrl || "https://placehold.co/250x250/CCCCCC/FFFFFF?text=Изображение+не+найдено";
+                    const orderProductName = orderProduct.name || "Название не найдено";
+                    const orderAvailableSizesHtml = orderProduct.availableSizes && orderProduct.availableSizes.length > 0
+                        ? orderProduct.availableSizes.map(size => `
+                            <button class="size-button ${size === orderProduct.selectedSize ? 'selected' : ''}" data-size="${size}">
+                                ${size}
+                            </button>
+                        `).join('')
+                        : '<p class="text-gray-500">Размеры не найдены</p>';
+
+
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('calculateCostProductDetails')">
+                                    <i class="fas fa-chevron-left mr-1"></i> Назад
+                                </button>
+                            </div>
+                            <div class="flex items-center mb-6">
+                                <img src="${orderImageUrl}" alt="${orderProductName}" class="w-24 h-24 rounded-lg mr-4 shadow-md">
+                                <div>
+                                    <h2 class="text-lg font-bold">${orderProductName}</h2>
+                                    <p class="text-sm text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
+                                    <p class="text-gray-600 text-sm">Размер: EU ${orderProduct.selectedSize || 'Не выбран'}</p>
+                                </div>
+                            </div>
+
+                            <div class="w-full mb-6">
+                                <p class="text-gray-700 text-sm font-bold mb-2">EU</p>
+                                <div class="flex flex-wrap gap-2">
+                                    ${orderAvailableSizesHtml}
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 w-full mb-6">
+                                <div class="bg-blue-100 p-3 rounded-xl text-center">
+                                    <p class="text-xl font-bold text-blue-700">${orderPrice.toFixed(0)} ₽</p>
+                                    <p class="text-sm text-blue-600">29-35 дней</p>
+                                </div>
+                                <div class="bg-blue-100 p-3 rounded-xl text-center">
+                                    <p class="text-xl font-bold text-blue-700">${(orderPrice + 1000).toFixed(0)} ₽</p> <!-- Примерная цена для ускоренной -->
+                                    <p class="text-sm text-blue-600">17-21 день</p>
+                                </div>
+                            </div>
+
+                            <h3 class="text-lg font-bold mb-3">Как получать</h3>
+                            <div class="flex bg-gray-100 rounded-xl p-1 mb-4">
+                                <button class="flex-1 py-2 rounded-lg bg-white shadow-sm font-medium">В магазине</button>
+                                <button class="flex-1 py-2 rounded-lg font-medium">В пункте выдачи</button>
+                                <button class="flex-1 py-2 rounded-lg font-medium">Курьером</button>
+                            </div>
+                            <p class="text-gray-700 mb-4">Сергиев Посад, Кооперативная ул, д.20</p>
+
+                            <h3 class="text-lg font-bold mb-3">Кому выдать</h3>
+                            <p class="text-gray-700 mb-2">Андрей Паскалов</p>
+                            <p class="text-gray-700 mb-4">+7 (910) 776 11 86</p>
+
+                            <div class="flex justify-between gap-4 mb-6">
+                                <button class="flex-1 bg-green-100 text-green-700 py-2 rounded-xl font-semibold">+50 баллов Начислить</button>
+                                <button class="flex-1 bg-red-100 text-red-700 py-2 rounded-xl font-semibold">-50 баллов Списать</button>
+                            </div>
+
+                            <div class="flex items-center justify-between bg-gray-100 p-3 rounded-xl mb-6">
+                                <p class="font-medium">Сплит: оплатить половину сейчас, половину позже</p>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" value="" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+
+                            <button id="place-order-btn" class="w-full bg-blue-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md mt-auto">
+                                Заказать ${orderPrice.toFixed(0)} ₽
+                            </button>
+                        </div>
+                    `;
+                    break;
+
+                case 'myOrders':
+                    headerTitle = 'Мои заказы';
+                    content = `
+                        <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
+                            <div class="flex items-center justify-between mb-4">
+                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm" onclick="renderPage('settings')">
+                                    <i class="fas fa-chevron-left mr-1"></i> Назад
+                                </button>
+                            </div>
+                            <h2 class="text-2xl font-bold mb-6 text-center">Мои заказы</h2>
+                            <div id="orders-list" class="space-y-4 mb-auto">
+                                <p class="text-center text-gray-500">Загрузка заказов...</p>
+                            </div>
+                            <div class="mt-8 text-center text-gray-500">
+                                <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                default:
+                    content = '<div class="p-4 text-center text-gray-500">Страница не найдена.</div>';
+                    break;
+            }
+
+            // Вставляем сгенерированный контент на страницу
+            appContent.innerHTML = content;
+
+            // Логика для конкретных страниц после их рендеринга
+            if (pageName === 'settings') {
+                // Логика для отображения имени и аватарки пользователя Telegram
+                const profileNameElement = document.getElementById('profile-name');
+                const profileAvatarElement = document.getElementById('profile-avatar');
+
+                console.log("Telegram WebApp object:", window.Telegram);
+                console.log("Telegram WebApp initDataUnsafe:", window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp.initDataUnsafe : "not available or Telegram.WebApp not initialized");
+
+                // Проверяем, доступны ли данные Telegram WebApp
+                // Используем window.telegramUserData, которое должно быть установлено после загрузки скрипта Telegram WebApp
+                if (window.telegramUserData) {
+                    const telegramUser = window.telegramUserData;
+                    let displayName = 'Пользователь'; // Заглушка по умолчанию
+
+                    console.log("Rendering Settings: Telegram User Data:", telegramUser);
+
+                    // --- ИЗМЕНЕНА ЛОГИКА ПРИОРИТЕТА ОТОБРАЖЕНИЯ ИМЕНИ ---
+                    if (telegramUser.first_name && telegramUser.last_name) {
+                        displayName = `${telegramUser.first_name} ${telegramUser.last_name}`;
+                    } else if (telegramUser.first_name) {
+                        displayName = telegramUser.first_name;
+                    } else if (telegramUser.username) {
+                        displayName = `@${telegramUser.username}`; // Используем никнейм только если нет имени/фамилии
+                    }
+                    // ----------------------------------------------------
+
+                    if (profileNameElement) {
+                        profileNameElement.textContent = displayName;
+                    }
+
+                    // Устанавливаем аватарку, если она доступна
+                    if (profileAvatarElement) {
+                        if (telegramUser.photo_url) {
+                            profileAvatarElement.src = telegramUser.photo_url;
+                            profileAvatarElement.alt = `Аватар ${displayName}`;
+                        } else {
+                            // Заглушка, если аватарка не найдена
+                            profileAvatarElement.src = "https://placehold.co/100x100/A0D9B1/FFFFFF?text=TG";
+                            profileAvatarElement.alt = "Аватар Telegram";
+                        }
+                    }
+                } else {
+                    // Если данные Telegram WebApp недоступны, используем заглушки
+                    console.warn("Rendering Settings: Telegram user data not available from global storage. Using default.");
+                    if (profileNameElement) {
+                        profileNameElement.textContent = "Гость"; // Как на твоем скрине
+                    }
+                    if (profileAvatarElement) {
+                        profileAvatarElement.src = "https://placehold.co/100x100/A0D9B1/FFFFFF?text=Андрей"; // Как на твоем скрине
+                        profileAvatarElement.alt = "Фото профиля по умолчанию";
+                    }
+                }
+            }
+
+            // Добавляем обработчик событий для кнопки "Далее" на странице calculateCostInputLink
+            if (pageName === 'calculateCostInputLink') {
+                document.getElementById('next-step-btn').addEventListener('click', async () => {
+                    const poizonLink = document.getElementById('poizon-link-input').value.trim();
+                    if (!poizonLink) {
+                        showMessage('Пожалуйста, вставьте ссылку на товар Poizon.');
+                        return;
+                    }
+
+                    showLoading('Собираем данные с Poizon...'); // Показываем загрузку
+
+                    try {
+                        console.log(`Отправка запроса на ${FETCH_POIZON_PRODUCT_FUNCTION_URL} с ссылкой: ${poizonLink}`);
+                        const response = await fetch(FETCH_POIZON_PRODUCT_FUNCTION_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ link: poizonLink }),
+                        });
+
+                        console.log("Получен ответ от сервера. Статус:", response.status);
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`Ошибка HTTP: ${response.status} - ${errorText}`);
+                            showMessage(`Ошибка сервера: ${response.status}. Подробности в консоли.`);
+                            hideLoading();
+                            return;
+                        }
+
+                        const result = await response.json();
+                        console.log("Парсинг JSON ответа сервера:", result);
+                        hideLoading(); // Скрываем загрузку
+
+                        if (result.success) {
+                            selectedProduct = { ...result.product, originalLink: poizonLink };
+                            // Устанавливаем размер по умолчанию, если он есть
+                            if (selectedProduct.availableSizes && selectedProduct.availableSizes.length > 0) {
+                                selectedProduct.selectedSize = selectedProduct.availableSizes[0];
+                            } else {
+                                selectedProduct.selectedSize = 'Без размера'; // Если размеров нет, указываем это
+                            }
+                            console.log("Данные товара успешно получены:", selectedProduct);
+                            renderPage('calculateCostProductDetails');
+                        } else {
+                            showMessage(result.message || 'Ошибка при получении данных с Poizon.');
+                            console.error('Ошибка сервера (ответ success: false):', result.error);
+                            // Если success: false, но нет specific error, выводим весь result
+                            if (!result.error) {
+                                console.error('Полный ответ сервера при success: false:', result);
+                            }
+                        }
+                    } catch (error) {
+                        hideLoading(); // Скрываем загрузку
+                        showMessage('Произошла сетевая ошибка при запросе данных. Проверьте консоль.');
+                        console.error('Сетевая ошибка или ошибка парсинга JSON:', error);
+                    }
+                });
+            }
+
+            // Добавляем логику для выбора размера на странице calculateCostProductDetails
+            if (pageName === 'calculateCostProductDetails') {
+                const sizeSelectionDiv = document.getElementById('size-selection');
+                if (sizeSelectionDiv && selectedProduct && selectedProduct.availableSizes) {
+                    sizeSelectionDiv.innerHTML = ''; // Очищаем, чтобы избежать дублирования
+                    selectedProduct.availableSizes.forEach(size => {
+                        const button = document.createElement('button');
+                        button.textContent = size;
+                        button.classList.add('size-button');
+                        if (size === selectedProduct.selectedSize) {
+                            button.classList.add('selected');
+                        }
+                        button.dataset.size = size;
+                        button.addEventListener('click', () => {
+                            // Убираем выделение со всех кнопок
+                            document.querySelectorAll('.size-button').forEach(btn => btn.classList.remove('selected'));
+                            // Выделяем текущую кнопку
+                            button.classList.add('selected');
+                            selectedProduct.selectedSize = size; // Обновляем выбранный размер
+                            showMessage(`Выбран размер: EU ${size}`);
+                        });
+                        sizeSelectionDiv.appendChild(button);
+                    });
+                }
+
+                // Добавляем обработчик для кнопки "Купить"
+                document.getElementById('buy-button').addEventListener('click', () => {
+                    // Перед переходом на страницу заказа, убедимся, что выбран размер
+                    if (selectedProduct && selectedProduct.selectedSize) {
+                        renderPage('orderConfirmation');
+                    } else {
+                        showMessage('Пожалуйста, выберите размер товара.');
+                    }
+                });
+            }
+
+            // Добавляем обработчик для кнопки "Заказать" на странице orderConfirmation
+            if (pageName === 'orderConfirmation') {
+                document.getElementById('place-order-btn').addEventListener('click', async () => {
+                    console.log("Попытка оформить заказ...");
+                    console.log("Firebase Ready:", window.isFirebaseReady, "Current User ID:", window.currentUserId);
+
+                    // Проверяем, что Firebase готов и пользователь аутентифицирован
+                    if (!window.isFirebaseReady || !window.currentUserId) {
+                        showMessage('Приложение загружается или нет пользователя. Пожалуйста, подождите.');
+                        console.error('Ошибка: Firebase не готов или нет UID пользователя.');
+                        return;
+                    }
+
+                    try {
+                        // Создаем объект заказа для сохранения в Firestore
+                        const orderData = {
+                            userId: window.currentUserId, // ID текущего пользователя
+                            productName: selectedProduct.name,
+                            productImageUrl: selectedProduct.imageUrl,
+                            productOriginalLink: selectedProduct.originalLink, // Сохраняем оригинальную ссылку
+                            selectedSize: selectedProduct.selectedSize,
+                            priceYuan: selectedProduct.priceYuan,
+                            totalPriceRub: selectedProduct.estimatedPriceRub, // Используем цену, рассчитанную функцией
+                            orderDate: new Date().toISOString(), // Дата и время заказа
+                            status: 'В обработке', // Начальный статус заказа
+                            deliveryMethod: 'В магазине', // Пока по умолчанию, можно добавить выбор
+                            deliveryAddress: 'Сергиев Посад, Кооперативная ул, д.20',
+                            recipientName: 'Андрей Паскалов',
+                            recipientPhone: '+7 (910) 776 11 86',
+                            estimatedDuty: selectedProduct.estimatedDuty
+                        };
+                        console.log("Данные заказа для сохранения:", orderData);
+
+                        // Сохраняем заказ в коллекцию 'orders' для данного пользователя
+                        // Путь к коллекции: /artifacts/{appId}/users/{userId}/orders
+                        const ordersCollectionRef = window.firestore.collection(
+                            window.db,
+                            `artifacts/${window.appId}/users/${window.currentUserId}/orders` // Используем window.appId
+                        );
+                        console.log("Путь к коллекции Firestore:", `artifacts/${window.appId}/users/${window.currentUserId}/orders`); // Используем window.appId
+
+                        await window.firestore.addDoc(ordersCollectionRef, orderData);
+
+                        showMessage('Заказ успешно оформлен и сохранен!');
+                        console.log('Заказ сохранен:', orderData);
+                        // Очищаем выбранный продукт после заказа
+                        selectedProduct = null;
+                        // Можно перенаправить пользователя на страницу заказов
+                        setTimeout(() => renderPage('myOrders'), 1500);
+
+                    } catch (error) {
+                        showMessage('Ошибка при оформлении заказа. Пожалуйста, попробуйте еще раз.');
+                        console.error('Ошибка при сохранении заказа в Firestore:', error);
+                    }
+                });
+
+                // Добавляем обработчики для кнопок выбора способа получения (пока просто визуальные)
+                document.querySelectorAll('.flex.bg-gray-100.rounded-xl.p-1.mb-4 button').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        document.querySelectorAll('.flex.bg-gray-100.rounded-xl.p-1.mb-4 button').forEach(btn => {
+                            btn.classList.remove('bg-white', 'shadow-sm');
+                        });
+                        event.target.classList.add('bg-white', 'shadow-sm');
+                        showMessage(`Выбран способ получения: ${event.target.textContent.trim()}`);
+                    });
+                });
+            }
+
+            // Логика для страницы "Мои заказы"
+            if (pageName === 'myOrders') {
+                const ordersListDiv = document.getElementById('orders-list');
+                ordersListDiv.innerHTML = '<p class="text-center text-gray-500">Загрузка заказов...</p>';
+
+                // Проверяем, что Firebase готов и пользователь аутентифицирован
+                if (!window.isFirebaseReady || !window.currentUserId) {
+                    ordersListDiv.innerHTML = '<p class="text-center text-red-500">Не удалось загрузить заказы. Пользователь не аутентифицирован.</p>';
+                    console.error('Ошибка: Firebase не готов или нет UID пользователя при загрузке заказов.');
+                    return;
+                }
+
+                // Получаем ссылку на коллекцию заказов текущего пользователя
+                const userOrdersCollectionRef = window.firestore.collection(
+                    window.db,
+                    `artifacts/${window.appId}/users/${window.currentUserId}/orders` // Используем window.appId
+                );
+                console.log("Попытка загрузить заказы из:", `artifacts/${window.appId}/users/${window.currentUserId}/orders`); // Используем window.appId
+
+
+                // Слушаем изменения в коллекции заказов в реальном времени
+                window.firestore.onSnapshot(userOrdersCollectionRef, (snapshot) => {
+                    if (snapshot.empty) {
+                        ordersListDiv.innerHTML = '<p class="text-center text-gray-500">У вас пока нет заказов.</p>';
+                        console.log("Заказов не найдено.");
+                        return;
+                    }
+
+                    ordersListDiv.innerHTML = ''; // Очищаем список перед обновлением
+                    snapshot.forEach(doc => {
+                        const order = doc.data();
+                        const orderId = doc.id; // ID документа заказа
+                        console.log("Загружен заказ:", orderId, order);
+                        ordersListDiv.innerHTML += `
+                            <div class="bg-white p-4 rounded-xl shadow-sm flex items-center space-x-4">
+                                <img src="${order.productImageUrl || 'https://placehold.co/80x80/CCCCCC/FFFFFF?text=Нет+фото'}" alt="${order.productName}" class="w-20 h-20 rounded-lg object-cover">
+                                <div class="flex-grow">
+                                    <p class="font-semibold text-lg">${order.productName || 'Название не указано'}</p>
+                                    <p class="text-gray-600 text-sm">Размер: EU ${order.selectedSize || 'Не выбран'}</p>
+                                    <p class="text-gray-600 text-sm">Статус: <span class="font-medium text-blue-600">${order.status || 'Неизвестно'}</span></p>
+                                    <p class="text-gray-800 font-bold mt-1">${order.totalPriceRub ? order.totalPriceRub.toFixed(0) : '0'} ₽</p>
+                                    <p class="text-gray-500 text-xs">Заказ от: ${order.orderDate ? new Date(order.orderDate).toLocaleDateString('ru-RU') : 'Неизвестно'}</p>
+                                    <p class="text-gray-500 text-xs">ID заказа: ${orderId}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }, (error) => {
+                    console.error("Ошибка получения заказов:", error);
+                    ordersListDiv.innerHTML = '<p class="text-center text-red-500">Ошибка при загрузке заказов.</p>';
+                });
+            }
+        }
+
+        // Добавляем обработчики событий для кнопок нижней навигации
+        document.querySelectorAll('.bottom-nav-item').forEach(button => {
+            button.addEventListener('click', () => {
+                renderPage(button.dataset.page); // Переключаем страницу при клике
+            });
+        });
+
+        // Изначальная загрузка страницы теперь происходит после инициализации Firebase
+        // document.addEventListener('DOMContentLoaded', () => {
+        //     renderPage('home');
+        // });
+    </script>
+</body>
+</html>
+
