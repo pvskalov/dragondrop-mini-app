@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DragonDrop App</title>
-    <!-- Подключение Tailwind CSS для стилей -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Подключение Font Awesome для иконок -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Подключение шрифта Inter от Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Все CSS-стили -->
     <style>
         /* Основные стили для тела страницы */
         body {
@@ -117,7 +113,6 @@
         }
     </style>
 
-    <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
     <script>
         const telegramWebAppScript = document.createElement('script');
         // Используем Date.now() для создания уникального параметра версии, чтобы обойти кэш
@@ -144,21 +139,16 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
-    <!-- Всплывающее сообщение (для уведомлений вместо alert()) -->
     <div id="messageBox" class="message-box"></div>
 
-    <!-- Индикатор загрузки -->
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="spinner"></div>
         <p>Загрузка данных...</p>
     </div>
 
-    <!-- Основная область контента приложения -->
     <div id="app-content" class="flex-grow pb-20 overflow-y-auto">
-        <!-- Сюда будет загружаться содержимое страниц с помощью JavaScript -->
-    </div>
+        </div>
 
-    <!-- Нижняя навигационная панель -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div class="flex justify-around h-16 max-w-screen-md mx-auto">
             <button class="bottom-nav-item active" data-page="home">
@@ -184,7 +174,6 @@
         </div>
     </nav>
 
-    <!-- Весь JavaScript-код -->
     <script type="module">
         // Импорты Firebase SDK (теперь внутри основного скрипта)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -346,6 +335,10 @@
 
         async function getUserProfile(userId, invitedByCode = null) {
             console.log("getUserProfile: Запрос профиля для userId:", userId);
+            if (!userId) {
+                console.error("getUserProfile: userId не определен. Невозможно получить/создать профиль.");
+                return null;
+            }
             const userDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}`);
             try {
                 const userDocSnap = await firestore.getDoc(userDocRef);
@@ -392,9 +385,7 @@
                     balance: firestore.increment(amount) // Использование increment
                 });
                 // Обновляем локальный профиль, чтобы UI сразу отразил изменения
-                if (currentUserProfile && currentUserProfile.referralCode === userId) {
-                    currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
-                } else if (currentUserProfile && currentUserId === userId) { // Используем currentUserId для прямого совпадения
+                if (currentUserProfile && currentUserId === userId) { // Использовать currentUserId для прямого совпадения
                      currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
                 }
                 showMessage(`Баланс обновлен на ${amount} ₽.`);
@@ -427,10 +418,12 @@
                     const unsubscribe = onAuthStateChanged(auth, async (user) => {
                         let determinedUserId = null;
 
+                        // Попытка определить userId сначала из Telegram.WebApp
                         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
                             determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
                             console.log("Firebase: UID определен как Telegram User ID:", determinedUserId);
                         } else if (user) {
+                            // Если Telegram ID нет, используем Firebase Auth UID
                             determinedUserId = user.uid;
                             console.log("Firebase: UID определен как Firebase Auth UID:", determinedUserId);
                         } else {
@@ -450,7 +443,8 @@
                                 }
                             } catch (authError) {
                                 console.error("Firebase: Ошибка аутентификации (custom token или анонимный):", authError);
-                                determinedUserId = 'anonymous_' + Math.random().toString(36).substring(2, 15);
+                                // Fallback: если совсем не удалось получить UID, генерируем временный
+                                determinedUserId = 'temp_anon_' + Math.random().toString(36).substring(2, 15);
                                 console.warn("Firebase: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
                                 showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
                             }
@@ -541,7 +535,7 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-3 mb-6">
+                            <div class="grid grid-cols-2 gap-4 mb-6">
                                 <div class="bg-red-500 text-white p-4 rounded-xl flex flex-col justify-between shadow-md">
                                     <p class="text-sm font-medium">Баллы</p>
                                     <p class="text-3xl font-bold">₽ ${userBalance}</p>
@@ -621,78 +615,84 @@
 
                 case 'friends':
                     // Убедимся, что currentUserProfile загружен перед отображением
-                    if (!currentUserProfile) {
+                    if (!currentUserProfile && currentUserId) { // Проверяем и currentUserId, чтобы не пытаться получить профиль для null/undefined ID
                         showLoading('Загрузка профиля...');
-                        await getUserProfile(currentUserId); // Перезагружаем или получаем профиль
-                        hideLoading();
-                        // Если профиль все еще не загружен, показываем заглушку
-                        if (!currentUserProfile) {
-                            content = `
-                                <div class="p-4 bg-white rounded-b-xl shadow-sm">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm back-button" data-target-page="home">
-                                            <i class="fas fa-times mr-1"></i> Закрыть
-                                        </button>
-                                    </div>
-                                    <div class="flex flex-col items-center justify-center py-10">
-                                        <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
-                                        <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
-                                        <p class="text-gray-600 text-center max-w-xs mb-4">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
-                                        <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
-                                            <p class="text-sm text-gray-600">Твой реферальный код:</p>
-                                            <p class="font-bold text-xl text-blue-600">Недоступен</p>
-                                            <p class="text-sm text-gray-600 mt-2">Или поделись ссылкой:</p>
-                                            <p class="text-red-500 text-sm">Ошибка загрузки данных профиля.</p>
-                                        </div>
-                                    </div>
-                                    <div class="p-4">
-                                        <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md" id="share-referral-btn">
-                                            Пригласить друга 500 ₽
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                            break;
+                        try {
+                            await getUserProfile(currentUserId); // Перезагружаем или получаем профиль
+                        } catch (e) {
+                            console.error("Ошибка при загрузке профиля для страницы Друзей:", e);
+                            showMessage("Не удалось загрузить профиль. Попробуйте перезагрузить.");
+                        } finally {
+                            hideLoading();
                         }
                     }
 
-                    const referralCode = currentUserProfile.referralCode;
-                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
-                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
-                    const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
-
-                    content = `
-                        <div class="p-4 bg-white rounded-b-xl shadow-sm">
-                            <div class="flex items-center justify-between mb-4">
-                                <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm back-button" data-target-page="home">
-                                    <i class="fas fa-times mr-1"></i> Закрыть
-                                </button>
-                            </div>
-                            <div class="flex flex-col items-center justify-center py-10">
-                                <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
-                                <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
-                                <p class="text-gray-600 text-center max-w-xs mb-4">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
-                                <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
-                                    <p class="text-sm text-gray-600">Твой реферальный код:</p>
-                                    <p class="font-bold text-xl text-blue-600">${referralCode}</p>
-                                    <p class="text-sm text-gray-600 mt-2">Или поделись ссылкой:</p>
-                                    <a href="${referralLink}" target="_blank" class="text-blue-500 text-sm break-all text-center mt-1">${referralLink}</a>
-                                    <button id="copy-referral-link-btn" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">
-                                        Скопировать ссылку
+                    // Если профиль все еще не загружен или не существует (после попытки загрузки)
+                    if (!currentUserProfile || !currentUserProfile.referralCode) {
+                        content = `
+                            <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                                <div class="flex items-center justify-between mb-4">
+                                    <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm back-button" data-target-page="home">
+                                        <i class="fas fa-times mr-1"></i> Закрыть
+                                    </button>
+                                </div>
+                                <div class="flex flex-col items-center justify-center py-10">
+                                    <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                    <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
+                                    <p class="text-gray-600 text-center max-w-xs mb-4">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
+                                    <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
+                                        <p class="text-sm text-gray-600">Твой реферальный код:</p>
+                                        <p class="font-bold text-xl text-blue-600">Недоступен</p>
+                                        <p class="text-sm text-gray-600 mt-2">Или поделись ссылкой:</p>
+                                        <p class="text-red-500 text-sm">Ошибка загрузки данных профиля или профиль не создан.</p>
+                                    </div>
+                                </div>
+                                <div class="p-4">
+                                    <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md" id="share-referral-btn">
+                                        Пригласить друга 500 ₽
                                     </button>
                                 </div>
                             </div>
-                            <div class="p-4">
-                                <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md" id="share-referral-btn">
-                                    Пригласить друга 500 ₽
-                                </button>
+                        `;
+                    } else {
+                        const referralCode = currentUserProfile.referralCode;
+                        // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
+                        const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
+                        const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
+
+                        content = `
+                            <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                                <div class="flex items-center justify-between mb-4">
+                                    <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm back-button" data-target-page="home">
+                                        <i class="fas fa-times mr-1"></i> Закрыть
+                                    </button>
+                                </div>
+                                <div class="flex flex-col items-center justify-center py-10">
+                                    <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                    <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
+                                    <p class="text-gray-600 text-center max-w-xs mb-4">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
+                                    <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
+                                        <p class="text-sm text-gray-600">Твой реферальный код:</p>
+                                        <p class="font-bold text-xl text-blue-600">${referralCode}</p>
+                                        <p class="text-sm text-gray-600 mt-2">Или поделись ссылкой:</p>
+                                        <a href="${referralLink}" target="_blank" class="text-blue-500 text-sm break-all text-center mt-1">${referralLink}</a>
+                                        <button id="copy-referral-link-btn" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded-lg text-sm font-semibold">
+                                            Скопировать ссылку
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4">
+                                    <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md" id="share-referral-btn">
+                                        Пригласить друга 500 ₽
+                                    </button>
+                                </div>
+                                <div class="mt-8 text-center text-gray-500">
+                                    <p>Здесь будет логика реферальной программы.</p>
+                                    <p>Данные будут загружаться с бэкенда.</p>
+                                </div>
                             </div>
-                            <div class="mt-8 text-center text-gray-500">
-                                <p>Здесь будет логика реферальной программы.</p>
-                                <p>Данные будут загружаться с бэкенда.</p>
-                            </div>
-                        </div>
-                    `;
+                        `;
+                    }
                     break;
 
                 case 'settings':
@@ -1062,20 +1062,26 @@
                 const copyReferralLinkBtn = document.getElementById('copy-referral-link-btn');
                 if (copyReferralLinkBtn) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
-                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
+                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'dragondrop_poizon_bot' НА РЕАЛЬНОЕ ИМЯ ТВОЕГО БОТА !!!
+                    const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                     copyReferralLinkBtn.addEventListener('click', async () => {
                         try {
-                            // Использование document.execCommand('copy') для совместимости с iframe
-                            const tempInput = document.createElement('textarea');
-                            tempInput.value = referralLink;
-                            document.body.appendChild(tempInput);
-                            tempInput.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(tempInput);
-                            showMessage('Ссылка скопирована!');
+                            // Использование Navigator API для копирования
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                await navigator.clipboard.writeText(referralLink);
+                                showMessage('Ссылка скопирована!');
+                            } else {
+                                // Fallback для старых браузеров или окружений без Clipboard API
+                                const tempInput = document.createElement('textarea');
+                                tempInput.value = referralLink;
+                                document.body.appendChild(tempInput);
+                                tempInput.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(tempInput);
+                                showMessage('Ссылка скопирована!');
+                            }
                         } catch (err) {
                             console.error('Не удалось скопировать ссылку:', err);
                             showMessage('Ошибка при копировании ссылки.');
@@ -1086,8 +1092,8 @@
                 const shareReferralBtn = document.getElementById('share-referral-btn');
                 if (shareReferralBtn && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.shareViaUrl) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
-                    const botUsername = 'YOUR_TELEGRAM_BOT_USERNAME'; // <--- ИЗМЕНИ ЭТО
+                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'dragondrop_poizon_bot' НА РЕАЛЬНОЕ ИМЯ ТВОЕГО БОТА !!!
+                    const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
                     const shareText = `Привет! Присоединяйся к DragonDrop и заказывай кроссовки из Poizon дешевле!\nИспользуй мой реферальный код: ${referralCode} или переходи по ссылке: ${referralLink}`;
 
@@ -1454,6 +1460,7 @@
                 }
 
                 let invitedByCode = null;
+                // Проверяем initDataUnsafe здесь, чтобы получить start_param, если он есть
                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
                     invitedByCode = window.Telegram.WebApp.initDataUnsafe.start_param;
                     console.log("main.js: Получен start_param:", invitedByCode);
