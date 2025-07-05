@@ -384,7 +384,8 @@
                 }
             } catch (error) {
                 console.error("getUserProfile: Ошибка при получении/создании профиля пользователя:", error);
-                showMessage("Ошибка: не удалось загрузить или создать профиль пользователя.");
+                // Не показываем showMessage здесь, так как это может быть вызвано из DOMContentLoaded
+                // и сообщение будет показано там.
                 throw error; // Перебрасываем ошибку, чтобы вызывающая функция могла её обработать
             }
         }
@@ -426,57 +427,77 @@
                 }
 
                 try {
-                    firebaseApp = initializeApp(firebaseConfig);
-                    db = getFirestore(firebaseApp);
-                    auth = getAuth(firebaseApp);
-                    console.log("Firebase: Приложение и сервисы инициализированы.");
+                    // Инициализируем Firebase App только один раз
+                    if (!firebaseApp) {
+                        firebaseApp = initializeApp(firebaseConfig);
+                        db = getFirestore(firebaseApp);
+                        auth = getAuth(firebaseApp);
+                        console.log("Firebase: Приложение и сервисы инициализированы.");
+                    } else {
+                        console.log("Firebase: Приложение уже инициализировано.");
+                    }
 
-                    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-                        let determinedUserId = null;
-                        console.log("onAuthStateChanged: Callback triggered.");
 
-                        // Попытка определить userId сначала из Telegram.WebApp
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
-                            determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
-                            console.log("onAuthStateChanged: Telegram User ID найден:", determinedUserId);
-                        } else if (user) {
-                            // Если Telegram ID нет, используем Firebase Auth UID
+                    let determinedUserId = null;
+
+                    // 1. Попытка определить userId из Telegram.WebApp (приоритет)
+                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+                        determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
+                        console.log("initFirebase: UID определен как Telegram User ID:", determinedUserId);
+                    }
+
+                    // 2. Если Telegram ID не найден, пробуем Firebase Auth
+                    if (!determinedUserId) {
+                        // Используем onAuthStateChanged для получения текущего пользователя
+                        // Если пользователь уже вошел (например, анонимно), user будет доступен
+                        const user = auth.currentUser;
+                        if (user) {
                             determinedUserId = user.uid;
-                            console.log("onAuthStateChanged: Firebase Auth UID найден:", determinedUserId);
+                            console.log("initFirebase: UID определен как существующий Firebase Auth UID:", determinedUserId);
                         } else {
-                            console.log("onAuthStateChanged: Пользователь не вошел в систему. Попытка аутентификации...");
+                            console.log("initFirebase: Пользователь не вошел в систему. Попытка аутентификации...");
                             try {
+                                // Попытка входа с custom token (если есть)
                                 if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-                                    console.log("onAuthStateChanged: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
+                                    console.log("initFirebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
                                     await signInWithCustomToken(auth, window.__initial_auth_token);
-                                    console.log("onAuthStateChanged: Вход с пользовательским токеном выполнен.");
+                                    console.log("initFirebase: Вход с пользовательским токеном выполнен.");
                                 } else {
-                                    console.log("onAuthStateChanged: initial_auth_token не обнаружен, выполнен анонимный вход.");
+                                    console.log("initFirebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
                                     await signInAnonymously(auth);
                                 }
                                 if (auth.currentUser) {
                                     determinedUserId = auth.currentUser.uid;
-                                    console.log("onAuthStateChanged: UID определен после входа:", determinedUserId);
+                                    console.log("initFirebase: UID определен после входа:", determinedUserId);
                                 }
                             } catch (authError) {
-                                console.error("onAuthStateChanged: Ошибка аутентификации (custom token или анонимный):", authError);
-                                // Fallback: если совсем не удалось получить UID, генерируем временный
-                                determinedUserId = 'temp_anon_' + Math.random().toString(36).substring(2, 15);
-                                console.warn("onAuthStateChanged: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
-                                showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
+                                console.error("initFirebase: Ошибка аутентификации (custom token или анонимный):", authError);
+                                // Если custom token не сработал или другая ошибка, всегда пытаемся анонимно
+                                console.log("initFirebase: Аутентификация не удалась, попытка анонимного входа как запасной вариант.");
+                                try {
+                                    await signInAnonymously(auth);
+                                    if (auth.currentUser) {
+                                        determinedUserId = auth.currentUser.uid;
+                                        console.log("initFirebase: Анонимный вход выполнен, UID:", determinedUserId);
+                                    }
+                                } catch (anonAuthError) {
+                                    console.error("initFirebase: Критическая ошибка: Анонимный вход также не удался:", anonAuthError);
+                                    // Если даже анонимный вход не удался, генерируем временный ID
+                                    determinedUserId = 'fallback_anon_' + Math.random().toString(36).substring(2, 15);
+                                    console.warn("initFirebase: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
+                                    showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
+                                }
                             }
                         }
+                    }
 
-                        currentUserId = determinedUserId;
-                        isFirebaseReady = true;
-                        console.log("onAuthStateChanged: isFirebaseReady установлен в true. Текущий UID для Firestore:", currentUserId);
-
-                        unsubscribe(); // Отписываемся сразу после определения первого состояния аутентификации
-                        resolve();
-                    });
+                    currentUserId = determinedUserId;
+                    isFirebaseReady = true;
+                    console.log("initFirebase: isFirebaseReady установлен в true. Окончательный UID для Firestore:", currentUserId);
+                    resolve();
 
                 } catch (error) {
-                    console.error("Ошибка инициализации Firebase:", error);
+                    console.error("initFirebase: Ошибка инициализации Firebase:", error);
                     showMessage('Ошибка инициализации приложения. Пожалуйста, попробуйте позже.');
                     isFirebaseReady = false;
                     reject(error);
@@ -632,11 +653,13 @@
 
                 case 'friends':
                     // STEP 1: Ensure Firebase is ready and we have a currentUserId
+                    // Если Firebase не готов ИЛИ currentUserId не определен, пытаемся инициализировать
                     if (!isFirebaseReady || !currentUserId) {
                         showLoading('Инициализация пользователя...');
                         try {
-                            await initFirebase(); // Повторная попытка инициализации, если не готов
+                            await initFirebase(); // Повторная попытка инициализации
                             if (!currentUserId) { // Если UID по-прежнему не определен после повторной инициализации
+                                console.error("renderPage('friends'): currentUserId не определен после initFirebase.");
                                 content = `
                                     <div class="p-4 bg-white rounded-b-xl shadow-sm">
                                         <div class="flex items-center justify-between mb-4">
@@ -662,7 +685,7 @@
                                     </div>
                                 `;
                                 hideLoading();
-                                break; // Выходим из switch
+                                break; // Выходим из switch, так как пользователь не определен
                             }
                         } catch (e) {
                             console.error("renderPage('friends'): Ошибка при повторной инициализации Firebase:", e);
@@ -670,7 +693,7 @@
                             hideLoading();
                             break; // Выходим из switch
                         } finally {
-                            hideLoading(); // Скрываем загрузку даже при ошибке
+                            // hideLoading(); // Скрываем загрузку даже при ошибке
                         }
                     }
 
@@ -689,6 +712,7 @@
 
                     // STEP 3: Рендерим в зависимости от того, доступен ли профиль и реферальный код
                     if (!currentUserProfile || !currentUserProfile.referralCode) {
+                        console.warn("renderPage('friends'): currentUserProfile или referralCode недоступен после попытки загрузки.");
                         content = `
                             <div class="p-4 bg-white rounded-b-xl shadow-sm">
                                 <div class="flex items-center justify-between mb-4">
