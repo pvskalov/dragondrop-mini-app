@@ -4,10 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DragonDrop App</title>
+    <!-- Подключение Tailwind CSS для стилей -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение Font Awesome для иконок -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Подключение шрифта Inter от Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- Все CSS-стили -->
     <style>
         /* Основные стили для тела страницы */
         body {
@@ -113,6 +117,7 @@
         }
     </style>
 
+    <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
     <script>
         const telegramWebAppScript = document.createElement('script');
         // Используем Date.now() для создания уникального параметра версии, чтобы обойти кэш
@@ -139,16 +144,21 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
+    <!-- Всплывающее сообщение (для уведомлений вместо alert()) -->
     <div id="messageBox" class="message-box"></div>
 
+    <!-- Индикатор загрузки -->
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="spinner"></div>
         <p>Загрузка данных...</p>
     </div>
 
+    <!-- Основная область контента приложения -->
     <div id="app-content" class="flex-grow pb-20 overflow-y-auto">
-        </div>
+        <!-- Сюда будет загружаться содержимое страниц с помощью JavaScript -->
+    </div>
 
+    <!-- Нижняя навигационная панель -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div class="flex justify-around h-16 max-w-screen-md mx-auto">
             <button class="bottom-nav-item active" data-page="home">
@@ -174,6 +184,7 @@
         </div>
     </nav>
 
+    <!-- Весь JavaScript-код -->
     <script type="module">
         // Импорты Firebase SDK (теперь внутри основного скрипта)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -334,14 +345,22 @@
         }
 
         async function getUserProfile(userId, invitedByCode = null) {
-            console.log("getUserProfile: Запрос профиля для userId:", userId);
+            console.log("getUserProfile: Запрос профиля для userId:", userId, "isFirebaseReady:", isFirebaseReady);
             if (!userId) {
                 console.error("getUserProfile: userId не определен. Невозможно получить/создать профиль.");
                 return null;
             }
+            // Убедимся, что db инициализирован перед выполнением операций Firestore
+            if (!db) {
+                console.error("getUserProfile: Firestore DB не инициализирован. Это критическая ошибка, initFirebase должен был быть вызван ранее.");
+                showMessage("Критическая ошибка: База данных не готова. Пожалуйста, перезагрузите приложение.");
+                return null;
+            }
+
             const userDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}`);
             try {
                 const userDocSnap = await firestore.getDoc(userDocRef);
+                console.log("getUserProfile: userDocSnap.exists() для userId", userId, ":", userDocSnap.exists());
 
                 if (userDocSnap.exists()) {
                     currentUserProfile = userDocSnap.data();
@@ -357,10 +376,7 @@
                         hasMadeFirstOrder: false
                     };
 
-                    if (invitedByCode) {
-                        console.log(`getUserProfile: Пользователь ${userId} приглашен кодом: ${invitedByCode}`);
-                    }
-
+                    console.log("getUserProfile: Создание нового профиля:", newUserProfile);
                     await firestore.setDoc(userDocRef, newUserProfile);
                     currentUserProfile = newUserProfile;
                     console.log("getUserProfile: Новый профиль пользователя создан:", currentUserProfile);
@@ -369,7 +385,7 @@
             } catch (error) {
                 console.error("getUserProfile: Ошибка при получении/создании профиля пользователя:", error);
                 showMessage("Ошибка: не удалось загрузить или создать профиль пользователя.");
-                throw error;
+                throw error; // Перебрасываем ошибку, чтобы вызывающая функция могла её обработать
             }
         }
 
@@ -417,44 +433,45 @@
 
                     const unsubscribe = onAuthStateChanged(auth, async (user) => {
                         let determinedUserId = null;
+                        console.log("onAuthStateChanged: Callback triggered.");
 
                         // Попытка определить userId сначала из Telegram.WebApp
                         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
                             determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
-                            console.log("Firebase: UID определен как Telegram User ID:", determinedUserId);
+                            console.log("onAuthStateChanged: Telegram User ID найден:", determinedUserId);
                         } else if (user) {
                             // Если Telegram ID нет, используем Firebase Auth UID
                             determinedUserId = user.uid;
-                            console.log("Firebase: UID определен как Firebase Auth UID:", determinedUserId);
+                            console.log("onAuthStateChanged: Firebase Auth UID найден:", determinedUserId);
                         } else {
-                            console.log("Firebase: Пользователь не вошел в систему. Попытка аутентификации...");
+                            console.log("onAuthStateChanged: Пользователь не вошел в систему. Попытка аутентификации...");
                             try {
                                 if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-                                    console.log("Firebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
+                                    console.log("onAuthStateChanged: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
                                     await signInWithCustomToken(auth, window.__initial_auth_token);
-                                    console.log("Firebase: Вход с пользовательским токеном выполнен.");
+                                    console.log("onAuthStateChanged: Вход с пользовательским токеном выполнен.");
                                 } else {
-                                    console.log("Firebase: initial_auth_token не обнаружен, выполнен анонимный вход.");
+                                    console.log("onAuthStateChanged: initial_auth_token не обнаружен, выполнен анонимный вход.");
                                     await signInAnonymously(auth);
                                 }
                                 if (auth.currentUser) {
                                     determinedUserId = auth.currentUser.uid;
-                                    console.log("Firebase: UID определен после входа:", determinedUserId);
+                                    console.log("onAuthStateChanged: UID определен после входа:", determinedUserId);
                                 }
                             } catch (authError) {
-                                console.error("Firebase: Ошибка аутентификации (custom token или анонимный):", authError);
+                                console.error("onAuthStateChanged: Ошибка аутентификации (custom token или анонимный):", authError);
                                 // Fallback: если совсем не удалось получить UID, генерируем временный
                                 determinedUserId = 'temp_anon_' + Math.random().toString(36).substring(2, 15);
-                                console.warn("Firebase: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
+                                console.warn("onAuthStateChanged: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
                                 showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
                             }
                         }
 
                         currentUserId = determinedUserId;
                         isFirebaseReady = true;
-                        console.log("Firebase: isFirebaseReady установлен в true. Текущий UID для Firestore:", currentUserId);
+                        console.log("onAuthStateChanged: isFirebaseReady установлен в true. Текущий UID для Firestore:", currentUserId);
 
-                        unsubscribe();
+                        unsubscribe(); // Отписываемся сразу после определения первого состояния аутентификации
                         resolve();
                     });
 
@@ -614,20 +631,63 @@
                     break;
 
                 case 'friends':
-                    // Убедимся, что currentUserProfile загружен перед отображением
-                    if (!currentUserProfile && currentUserId) { // Проверяем и currentUserId, чтобы не пытаться получить профиль для null/undefined ID
+                    // STEP 1: Ensure Firebase is ready and we have a currentUserId
+                    if (!isFirebaseReady || !currentUserId) {
+                        showLoading('Инициализация пользователя...');
+                        try {
+                            await initFirebase(); // Повторная попытка инициализации, если не готов
+                            if (!currentUserId) { // Если UID по-прежнему не определен после повторной инициализации
+                                content = `
+                                    <div class="p-4 bg-white rounded-b-xl shadow-sm">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <button class="flex items-center px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm back-button" data-target-page="home">
+                                                <i class="fas fa-times mr-1"></i> Закрыть
+                                            </button>
+                                        </div>
+                                        <div class="flex flex-col items-center justify-center py-10">
+                                            <img src="https://placehold.co/150x150/FFD700/FFFFFF?text=🦆" alt="Утка" class="duck-image mb-6">
+                                            <h2 class="text-2xl font-bold mb-2 text-center">Приглашай друзей</h2>
+                                            <p class="text-gray-600 text-center max-w-xs mb-4">Друг получит 500₽ сразу, а ты получишь 500₽, когда друг сделает первый заказ</p>
+                                            <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
+                                                <p class="text-sm text-gray-600">Твой реферальный код:</p>
+                                                <p class="font-bold text-xl text-blue-600">Недоступен</p>
+                                                <p class="text-red-500 text-sm">Ошибка: Пользователь не определен. Пожалуйста, перезагрузите приложение.</p>
+                                            </div>
+                                        </div>
+                                        <div class="p-4">
+                                            <button class="w-full bg-pink-500 text-white py-3 rounded-xl text-lg font-semibold shadow-md" id="share-referral-btn">
+                                                Пригласить друга 500 ₽
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                                hideLoading();
+                                break; // Выходим из switch
+                            }
+                        } catch (e) {
+                            console.error("renderPage('friends'): Ошибка при повторной инициализации Firebase:", e);
+                            showMessage("Ошибка инициализации. Попробуйте перезагрузить.");
+                            hideLoading();
+                            break; // Выходим из switch
+                        } finally {
+                            hideLoading(); // Скрываем загрузку даже при ошибке
+                        }
+                    }
+
+                    // STEP 2: Теперь, когда currentUserId гарантирован, пытаемся загрузить/создать профиль
+                    if (!currentUserProfile) {
                         showLoading('Загрузка профиля...');
                         try {
-                            await getUserProfile(currentUserId); // Перезагружаем или получаем профиль
+                            await getUserProfile(currentUserId);
                         } catch (e) {
-                            console.error("Ошибка при загрузке профиля для страницы Друзей:", e);
+                            console.error("renderPage('friends'): Ошибка при загрузке/создании профиля:", e);
                             showMessage("Не удалось загрузить профиль. Попробуйте перезагрузить.");
                         } finally {
                             hideLoading();
                         }
                     }
 
-                    // Если профиль все еще не загружен или не существует (после попытки загрузки)
+                    // STEP 3: Рендерим в зависимости от того, доступен ли профиль и реферальный код
                     if (!currentUserProfile || !currentUserProfile.referralCode) {
                         content = `
                             <div class="p-4 bg-white rounded-b-xl shadow-sm">
@@ -643,8 +703,7 @@
                                     <div class="bg-gray-100 p-3 rounded-xl w-full max-w-sm flex flex-col items-center mb-6 shadow-inner">
                                         <p class="text-sm text-gray-600">Твой реферальный код:</p>
                                         <p class="font-bold text-xl text-blue-600">Недоступен</p>
-                                        <p class="text-sm text-gray-600 mt-2">Или поделись ссылкой:</p>
-                                        <p class="text-red-500 text-sm">Ошибка загрузки данных профиля или профиль не создан.</p>
+                                        <p class="text-red-500 text-sm">Профиль не загружен или реферальный код отсутствует.</p>
                                     </div>
                                 </div>
                                 <div class="p-4">
@@ -656,8 +715,7 @@
                         `;
                     } else {
                         const referralCode = currentUserProfile.referralCode;
-                        // !!! ВНИМАНИЕ: ЗАМЕНИ 'YOUR_TELEGRAM_BOT_USERNAME' НА 'dragondrop_poizon_bot' !!!
-                        const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
+                        const botUsername = 'dragondrop_poizon_bot'; // Имя твоего бота
                         const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                         content = `
@@ -1062,8 +1120,7 @@
                 const copyReferralLinkBtn = document.getElementById('copy-referral-link-btn');
                 if (copyReferralLinkBtn) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'dragondrop_poizon_bot' НА РЕАЛЬНОЕ ИМЯ ТВОЕГО БОТА !!!
-                    const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
+                    const botUsername = 'dragondrop_poizon_bot'; // Имя твоего бота
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                     copyReferralLinkBtn.addEventListener('click', async () => {
@@ -1092,8 +1149,7 @@
                 const shareReferralBtn = document.getElementById('share-referral-btn');
                 if (shareReferralBtn && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.shareViaUrl) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    // !!! ВНИМАНИЕ: ЗАМЕНИ 'dragondrop_poizon_bot' НА РЕАЛЬНОЕ ИМЯ ТВОЕГО БОТА !!!
-                    const botUsername = 'dragondrop_poizon_bot'; // <--- ИЗМЕНИЛ ЗДЕСЬ
+                    const botUsername = 'dragondrop_poizon_bot'; // Имя твоего бота
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
                     const shareText = `Привет! Присоединяйся к DragonDrop и заказывай кроссовки из Poizon дешевле!\nИспользуй мой реферальный код: ${referralCode} или переходи по ссылке: ${referralLink}`;
 
@@ -1453,7 +1509,7 @@
                 await initFirebase();
 
                 if (!currentUserId) {
-                    console.error("main.js: currentUserId не был определен после initFirebase. Это критическая ошибка.");
+                    console.error("DOMContentLoaded: currentUserId не был определен после initFirebase. Это критическая ошибка.");
                     showMessage('Ошибка: Не удалось определить пользователя. Пожалуйста, перезагрузите приложение.');
                     hideLoading();
                     return;
@@ -1463,7 +1519,7 @@
                 // Проверяем initDataUnsafe здесь, чтобы получить start_param, если он есть
                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
                     invitedByCode = window.Telegram.WebApp.initDataUnsafe.start_param;
-                    console.log("main.js: Получен start_param:", invitedByCode);
+                    console.log("DOMContentLoaded: Получен start_param:", invitedByCode);
                 }
 
                 await getUserProfile(currentUserId, invitedByCode);
@@ -1471,7 +1527,7 @@
                 hideLoading();
                 renderPage('home');
             } catch (error) {
-                console.error("main.js: Ошибка при запуске приложения:", error);
+                console.error("DOMContentLoaded: Ошибка при запуске приложения:", error);
                 showMessage('Ошибка при запуске приложения. Пожалуйста, попробуйте позже.');
                 hideLoading();
             }
