@@ -134,7 +134,7 @@
                     console.log("Telegram User Data (after ready):", telegramUser);
                     window.telegramUserData = telegramUser; // Сохраняем данные пользователя глобально
                 } else {
-                    console.warn("Telegram WebApp user data not available after ready(). initDataUnsafe:", Telegram.WebApp.initDataUnsafe ? Telegram.WebApp.initDataUnsafe : "Telegram.WebApp.initDataUnsafe is null/undefined");
+                    console.warn("Telegram WebApp user data not available after ready(). initDataUnsafe:", window.Telegram.WebApp.initDataUnsafe ? window.Telegram.WebApp.initDataUnsafe : "Telegram.WebApp.initDataUnsafe is null/undefined");
                 }
             } else {
                 console.warn("Telegram WebApp object not found after script load.");
@@ -209,7 +209,7 @@
 
         // ТВОЯ КОНФИГУРАЦИЯ FIREBASE
         const firebaseConfig = {
-            apiKey: "AIzaSyAs32uOlV5VugkioYbT-PvS-D0L-5IF_mE",
+            apiKey: "AIzaSyAs32uOlV5VugkioYbS-PvS-D0L-5IF_mE",
             authDomain: "dragondropapp-9e6a6.firebaseapp.com",
             projectId: "dragondropapp-9e6a6",
             storageBucket: "dragondropapp-9e6a6.firebasestorage.app",
@@ -548,8 +548,9 @@
                                 </div>
                                 <!-- Убрана синяя кнопка "Добавить" -->
                             </div>
-                            <div class="flex items-center justify-between mb-4">
-                                <h1 class="text-xl font-semibold">DragonDrop</h1>
+                            <div class="flex items-center justify-start mb-4">
+                                <h1 class="text-xl font-semibold mr-2">DragonDrop</h1>
+                                <img src="https://i.ibb.co/Jb3yTqM/IMG-6383-edited-free-carve-photos.png" alt="DragonDrop Logo" class="h-32 w-auto">
                             </div>
                             <div class="relative mb-4">
                                 <input type="text" id="search-input" placeholder="Найти товар" class="w-full p-3 pl-10 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
