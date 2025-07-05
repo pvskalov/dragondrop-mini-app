@@ -8,8 +8,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Подключение Font Awesome для иконок -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Подключение шрифта Inter от Google Fonts -->
+    
+    <!-- --- ИЗМЕНЕНИЕ: Подключение новых шрифтов --- -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Основной шрифт Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Новый шрифт Tektur для заголовка -->
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500&display=swap" rel="stylesheet">
 
     <!-- Все CSS-стили -->
     <style>
@@ -19,6 +25,10 @@
             background-color: #f0f2f5; /* Светло-серый фон */
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+        }
+        /* --- ИЗМЕНЕНИЕ: Стиль для нового шрифта --- */
+        .font-tektur {
+            font-family: 'Tektur', sans-serif;
         }
         /* Пользовательские стили для изображения утки, чтобы оно правильно масштабировалось */
         .duck-image {
@@ -209,7 +219,7 @@
 
         // ТВОЯ КОНФИГУРАЦИЯ FIREBASE
         const firebaseConfig = {
-            apiKey: "AIzaSyAs32uOlV5VugkioYbS-PvS-D0L-5IF_mE",
+            apiKey: "AIzaSyAs32uOlV5VugkioYbT-PvS-D0L-5IF_mE",
             authDomain: "dragondropapp-9e6a6.firebaseapp.com",
             projectId: "dragondropapp-9e6a6",
             storageBucket: "dragondropapp-9e6a6.firebasestorage.app",
@@ -549,8 +559,10 @@
                                 <!-- Убрана синяя кнопка "Добавить" -->
                             </div>
                             <div class="flex items-center justify-start mb-4">
-                                <h1 class="text-xl font-semibold mr-2">DragonDrop</h1>
-                                <img src="https://i.ibb.co/Jb3yTqM/IMG-6383-edited-free-carve-photos.png" alt="DragonDrop Logo" class="h-32 w-auto">
+                                <!-- --- ИЗМЕНЕНИЕ: Добавлен класс .font-tektur и изменен размер шрифта --- -->
+                                <h1 class="text-3xl font-bold uppercase mr-4 font-tektur">DragonDrop</h1>
+                                <!-- --- ИЗМЕНЕНИЕ: Уменьшен размер логотипа (h-32 -> h-16) --- -->
+                                <img src="https://i.ibb.co/SwBSwcn8/IMG-6383-edited-free-carve-photos.png" alt="DragonDrop Logo" class="h-16 w-auto">
                             </div>
                             <div class="relative mb-4">
                                 <input type="text" id="search-input" placeholder="Найти товар" class="w-full p-3 pl-10 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
