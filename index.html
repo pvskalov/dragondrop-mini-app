@@ -4,20 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DragonDrop App</title>
-    <!-- Подключение Tailwind CSS для стилей -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Подключение Font Awesome для иконок -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- --- ИЗМЕНЕНИЕ: Подключение новых шрифтов --- -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Основной шрифт Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Новый шрифт Tektur для заголовка -->
     <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500&display=swap" rel="stylesheet">
 
-    <!-- Все CSS-стили -->
     <style>
         /* Основные стили для тела страницы */
         body {
@@ -127,7 +121,6 @@
         }
     </style>
 
-    <!-- ВАЖНО: Подключение Telegram WebApp SDK с динамическим кэш-бастером -->
     <script>
         const telegramWebAppScript = document.createElement('script');
         // Используем Date.now() для создания уникального параметра версии, чтобы обойти кэш
@@ -154,21 +147,16 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
-    <!-- Всплывающее сообщение (для уведомлений вместо alert()) -->
     <div id="messageBox" class="message-box"></div>
 
-    <!-- Индикатор загрузки -->
     <div id="loadingOverlay" class="loading-overlay hidden">
         <div class="spinner"></div>
         <p>Загрузка данных...</p>
     </div>
 
-    <!-- Основная область контента приложения -->
     <div id="app-content" class="flex-grow pb-20 overflow-y-auto">
-        <!-- Сюда будет загружаться содержимое страниц с помощью JavaScript -->
-    </div>
+        </div>
 
-    <!-- Нижняя навигационная панель -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
         <div class="flex justify-around h-16 max-w-screen-md mx-auto">
             <button class="bottom-nav-item active" data-page="home">
@@ -194,7 +182,6 @@
         </div>
     </nav>
 
-    <!-- Весь JavaScript-код -->
     <script type="module">
         // Импорты Firebase SDK (теперь внутри основного скрипта)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -264,88 +251,52 @@
             }
         }
 
-        // --- api.js функции (теперь встроены) ---
-        const FETCH_POIZON_PRODUCT_FUNCTION_URL = 'http://localhost:3000/fetch-poizon-product';
-        const TRACK_DOBROPOST_PARCEL_FUNCTION_URL = 'http://localhost:3000/track-dobropost-parcel';
-
+        // --- ИЗМЕНЕНИЕ: api.js функции теперь симулируются прямо здесь ---
+        
         async function fetchPoizonProduct(link) {
-            showLoading('Собираем данные с Poizon...');
-            try {
-                console.log(`API: Отправка запроса на ${FETCH_POIZON_PRODUCT_FUNCTION_URL} с ссылкой: ${link}`);
-                const response = await fetch(FETCH_POIZON_PRODUCT_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ link: link }),
-                });
+            showLoading('Собираем данные (симуляция)...');
+            console.log(`Симуляция запроса на информацию о товаре Poizon: ${link}`);
 
-                console.log("API: Получен ответ от сервера. Статус:", response.status);
+            // Возвращаем тестовые данные, чтобы не зависеть от бэкенда.
+            // Можешь менять эти данные для своих тестов.
+            const productData = {
+                name: 'Nike Dunk Low "Panda"', // Более реалистичное название для тестов
+                imageUrl: 'https://i.ibb.co/CbcGk04/sneakers.png', // Реальная картинка для наглядности
+                priceYuan: 550,
+                availableSizes: ['38', '39', '40', '41', '42', '43', '44'],
+                estimatedPriceRub: 10924,
+                estimatedDuty: 0
+            };
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`API: Ошибка HTTP: ${response.status} - ${errorText}`);
-                    showMessage(`Ошибка сервера: ${response.status}. Подробности в консоли.`);
-                    return null;
-                }
+            // Имитируем небольшую задержку, как будто данные пришли по сети
+            await new Promise(resolve => setTimeout(resolve, 500)); 
 
-                const result = await response.json();
-                console.log("API: Парсинг JSON ответа сервера:", result);
-
-                if (result.success) {
-                    return result.product;
-                } else {
-                    showMessage(result.message || 'Ошибка при получении данных с Poizon.');
-                    console.error('API: Ошибка сервера (ответ success: false):', result.error || result);
-                    return null;
-                }
-            } catch (error) {
-                showMessage('Произошла сетевая ошибка при запросе данных. Проверьте консоль.');
-                console.error('API: Сетевая ошибка или ошибка парсинга JSON:', error);
-                return null;
-            } finally {
-                hideLoading();
-            }
+            hideLoading();
+            // Возвращаем данные так, как будто получили их с сервера
+            return productData;
         }
 
         async function trackDobropostParcel(trackingNumber) {
-            showLoading('Отслеживаем посылку...');
-            try {
-                console.log(`API: Отправка запроса на ${TRACK_DOBROPOST_PARCEL_FUNCTION_URL} с номером: ${trackingNumber}`);
-                const response = await fetch(TRACK_DOBROPOST_PARCEL_FUNCTION_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ trackingNumber: trackingNumber }),
-                });
+            showLoading('Отслеживаем посылку (симуляция)...');
+            console.log(`Симуляция запроса на отслеживание для номера: ${trackingNumber}`);
 
-                console.log("API: Получен ответ от сервера. Статус:", response.status);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`API: Ошибка HTTP: ${response.status} - ${errorText}`);
-                    showMessage(`Ошибка сервера: ${response.status}. Подробности в консоли.`);
-                    return null;
-                }
-
-                const result = await response.json();
-                console.log("API: Парсинг JSON ответа сервера:", result);
-
-                if (result.success) {
-                    return result.trackingInfo;
-                } else {
-                    showMessage(result.message || 'Ошибка при отслеживании посылки.');
-                    console.error('API: Ошибка сервера (ответ success: false):', result.error || result);
-                    return null;
-                }
-            } catch (error) {
-                showMessage('Произошла сетевая ошибка при отслеживании. Проверьте консоль.');
-                console.error('API: Сетевая ошибка или ошибка парсинга JSON:', error);
-                return null;
-            } finally {
-                hideLoading();
-            }
+            // Возвращаем тестовые данные для отслеживания
+            const trackingInfo = {
+                number: trackingNumber,
+                status: 'В пути (симуляция)',
+                lastUpdate: new Date().toLocaleString('ru-RU'),
+                history: [
+                    { date: '2025-06-25', location: 'Китай, Шэньчжэнь', description: 'Посылка принята' },
+                    { date: '2025-06-28', location: 'Китай, Гуанчжоу', description: 'Отправлено из сортировочного центра' },
+                    { date: '2025-07-01', location: 'Москва, Внуково', description: 'Прибыло в Россию' },
+                ]
+            };
+            
+            // Имитируем небольшую задержку
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            hideLoading();
+            return trackingInfo;
         }
 
         // --- Firebase-related functions (теперь встроены) ---
@@ -868,7 +819,6 @@
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <!-- --- ИЗМЕНЕНИЕ: Обернуто в тег 'a' для ссылки --- -->
                                 <a href="https://t.me/dragondrop_poizon_bot/DragonDrop?startapp&addToHomeScreen" target="_blank" class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm cursor-pointer no-underline">
                                     <i class="fas fa-plus-circle text-blue-500 mr-3 text-lg"></i>
                                     <span class="flex-grow text-gray-800">Добавить на экран «Домой»</span>
@@ -882,7 +832,6 @@
                                     <span class="flex-grow">Мой профиль</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <!-- --- ИЗМЕНЕНИЕ: Пункт "Статус" удален --- -->
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
                                     <i class="fas fa-wallet text-green-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Баланс</span>
@@ -898,7 +847,6 @@
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <!-- --- ИЗМЕНЕНИЕ: Добавлен id для счетчика и используется переменная --- -->
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer" id="my-orders-link">
                                     <i class="fas fa-box text-red-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Заказы</span>
@@ -910,7 +858,6 @@
                                     <span class="flex-grow">Отзывы</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <!-- --- ИЗМЕНЕНИЕ: Добавлен id для счетчика и используется переменная --- -->
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer" data-page="favorites">
                                     <i class="fas fa-heart text-pink-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Избранное</span>
@@ -922,8 +869,7 @@
                                     <span class="flex-grow">Просмотренные товары</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <!-- --- ИЗМЕНЕНИЕ: Пункты "Конфиденциальность" и "Подборки" удалены --- -->
-                            </div>
+                                </div>
                             <div class="mt-8 text-center text-gray-500">
                                 <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
                             </div>
@@ -1015,7 +961,7 @@
                         : '<p class="text-gray-500">Размеры не найдены</p>';
                     
                     // --- ИЗМЕНЕНИЕ: ID для иконки избранного ---
-                    const productId = btoa(product.originalLink);
+                    const productId = btoa(product.originalLink || Date.now().toString()); // Добавил Date.now() на случай пустой ссылки
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -1028,7 +974,6 @@
                                 <img src="${imageUrl}" alt="${productName}" class="w-full max-w-xs rounded-lg shadow-md mb-4">
                                 <p class="text-sm text-green-600 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
                                 
-                                <!-- --- ИЗМЕНЕНИЕ: Добавлена иконка избранного --- -->
                                 <div class="flex items-center justify-center space-x-4 w-full max-w-xs mb-2">
                                     <h2 class="text-xl font-bold text-center">${productName}</h2>
                                     <i id="favorite-icon-${productId}" class="far fa-heart text-2xl text-gray-400 cursor-pointer transition-all duration-200"></i>
@@ -1391,7 +1336,7 @@
                 
                 // --- ИЗМЕНЕНИЕ: Логика для иконки избранного ---
                 const product = selectedProduct;
-                const productId = btoa(product.originalLink);
+                const productId = btoa(product.originalLink || Date.now().toString());
                 const heartIcon = document.getElementById(`favorite-icon-${productId}`);
 
                 if (heartIcon && currentUserId && db) {
