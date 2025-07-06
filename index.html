@@ -208,6 +208,10 @@
         let auth = null;
         let currentUserId = null;
         let isFirebaseReady = false;
+        // --- ИЗМЕНЕНИЕ: Глобальные переменные для счетчиков ---
+        let userOrdersCount = 0;
+        let userFavoritesCount = 0;
+
         // Объект firestore теперь включает serverTimestamp и increment
         const firestore = {
             getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, increment
@@ -360,7 +364,6 @@
                 console.error("getUserProfile: userId не определен. Невозможно получить/создать профиль.");
                 return null;
             }
-            // Убедимся, что db инициализирован перед выполнением операций Firestore
             if (!db) {
                 console.error("getUserProfile: Firestore DB не инициализирован. Это критическая ошибка, initFirebase должен был быть вызван ранее.");
                 showMessage("Критическая ошибка: База данных не готова. Пожалуйста, перезагрузите приложение.");
@@ -381,7 +384,7 @@
                     const newUserProfile = {
                         balance: 0,
                         referralCode: generateReferralCode(),
-                        createdAt: firestore.serverTimestamp(), // Использование serverTimestamp
+                        createdAt: firestore.serverTimestamp(),
                         invitedBy: invitedByCode || null,
                         hasMadeFirstOrder: false
                     };
@@ -394,9 +397,7 @@
                 }
             } catch (error) {
                 console.error("getUserProfile: Ошибка при получении/создании профиля пользователя:", error);
-                // Не показываем showMessage здесь, так как это может быть вызвано из DOMContentLoaded
-                // и сообщение будет показано там.
-                throw error; // Перебрасываем ошибку, чтобы вызывающая функция могла её обработать
+                throw error;
             }
         }
 
@@ -409,10 +410,9 @@
             const userDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}`);
             try {
                 await firestore.updateDoc(userDocRef, {
-                    balance: firestore.increment(amount) // Использование increment
+                    balance: firestore.increment(amount)
                 });
-                // Обновляем локальный профиль, чтобы UI сразу отразил изменения
-                if (currentUserProfile && currentUserId === userId) { // Использовать currentUserId для прямого совпадения
+                if (currentUserProfile && currentUserId === userId) {
                      currentUserProfile.balance = (currentUserProfile.balance || 0) + amount;
                 }
                 showMessage(`Баланс обновлен на ${amount} ₽.`);
@@ -422,6 +422,85 @@
                 showMessage("Ошибка при обновлении баланса.");
             }
         }
+        
+        // --- ИЗМЕНЕНИЕ: Новая функция для работы с избранным ---
+        async function toggleFavorite(userId, product) {
+            if (!userId || !db || !product || !product.originalLink) {
+                showMessage('Ошибка: Не удалось добавить в избранное. Пользователь или товар не определены.');
+                console.error('toggleFavorite aborting:', { userId, db, product });
+                return;
+            }
+            // Используем btoa для создания валидного ID документа из URL
+            const productId = btoa(product.originalLink);
+            const favoriteDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}/favorites/${productId}`);
+            const heartIcon = document.getElementById(`favorite-icon-${productId}`);
+
+            try {
+                const docSnap = await firestore.getDoc(favoriteDocRef);
+                if (docSnap.exists()) {
+                    // Товар в избранном, удаляем
+                    await firestore.deleteDoc(favoriteDocRef);
+                    showMessage('Удалено из избранного');
+                    if (heartIcon) {
+                        heartIcon.classList.remove('fas', 'text-red-500');
+                        heartIcon.classList.add('far', 'text-gray-400');
+                    }
+                } else {
+                    // Товара нет в избранном, добавляем
+                    const favoriteData = {
+                        name: product.name,
+                        imageUrl: product.imageUrl,
+                        originalLink: product.originalLink,
+                        priceYuan: product.priceYuan,
+                        estimatedPriceRub: product.estimatedPriceRub,
+                        addedAt: firestore.serverTimestamp()
+                    };
+                    await firestore.setDoc(favoriteDocRef, favoriteData);
+                    showMessage('Добавлено в избранное!');
+                    if (heartIcon) {
+                        heartIcon.classList.remove('far', 'text-gray-400');
+                        heartIcon.classList.add('fas', 'text-red-500');
+                    }
+                }
+            } catch (error) {
+                console.error("Ошибка при переключении избранного:", error);
+                showMessage('Ошибка при работе с избранным.');
+            }
+        }
+
+        // --- ИЗМЕНЕНИЕ: Новая функция для отслеживания счетчиков ---
+        function listenToUserCounts(userId) {
+            if (!userId || !db) return;
+
+            // Слушатель для счетчика заказов
+            const ordersCollectionRef = firestore.collection(db, `artifacts/${appId}/users/${userId}/orders`);
+            firestore.onSnapshot(ordersCollectionRef, (snapshot) => {
+                userOrdersCount = snapshot.size;
+                console.log(`Счетчик заказов обновлен: ${userOrdersCount}`);
+                const activePage = document.querySelector('.bottom-nav-item.active')?.dataset.page;
+                if (activePage === 'settings') {
+                    const ordersCountSpan = document.getElementById('orders-count');
+                    if(ordersCountSpan) ordersCountSpan.textContent = userOrdersCount;
+                }
+            }, (error) => {
+                console.error("Ошибка отслеживания счетчика заказов:", error);
+            });
+
+            // Слушатель для счетчика избранного
+            const favoritesCollectionRef = firestore.collection(db, `artifacts/${appId}/users/${userId}/favorites`);
+            firestore.onSnapshot(favoritesCollectionRef, (snapshot) => {
+                userFavoritesCount = snapshot.size;
+                console.log(`Счетчик избранного обновлен: ${userFavoritesCount}`);
+                const activePage = document.querySelector('.bottom-nav-item.active')?.dataset.page;
+                if (activePage === 'settings') {
+                     const favoritesCountSpan = document.getElementById('favorites-count');
+                    if(favoritesCountSpan) favoritesCountSpan.textContent = userFavoritesCount;
+                }
+            }, (error) => {
+                console.error("Ошибка отслеживания счетчика избранного:", error);
+            });
+        }
+
 
         async function initFirebase() {
             return new Promise(async (resolve, reject) => {
@@ -437,7 +516,6 @@
                 }
 
                 try {
-                    // Инициализируем Firebase App только один раз
                     if (!firebaseApp) {
                         firebaseApp = initializeApp(firebaseConfig);
                         db = getFirestore(firebaseApp);
@@ -450,16 +528,12 @@
 
                     let determinedUserId = null;
 
-                    // 1. Попытка определить userId из Telegram.WebApp (приоритет)
                     if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
                         determinedUserId = String(window.Telegram.WebApp.initDataUnsafe.user.id);
                         console.log("initFirebase: UID определен как Telegram User ID:", determinedUserId);
                     }
 
-                    // 2. Если Telegram ID не найден, пробуем Firebase Auth
                     if (!determinedUserId) {
-                        // Используем onAuthStateChanged для получения текущего пользователя
-                        // Если пользователь уже вошел (например, анонимно), user будет доступен
                         const user = auth.currentUser;
                         if (user) {
                             determinedUserId = user.uid;
@@ -467,7 +541,6 @@
                         } else {
                             console.log("initFirebase: Пользователь не вошел в систему. Попытка аутентификации...");
                             try {
-                                // Попытка входа с custom token (если есть)
                                 if (typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
                                     console.log("initFirebase: Обнаружен initial_auth_token. Попытка входа с пользовательским токеном...");
                                     await signInWithCustomToken(auth, window.__initial_auth_token);
@@ -482,7 +555,6 @@
                                 }
                             } catch (authError) {
                                 console.error("initFirebase: Ошибка аутентификации (custom token или анонимный):", authError);
-                                // Если custom token не сработал или другая ошибка, всегда пытаемся анонимно
                                 console.log("initFirebase: Аутентификация не удалась, попытка анонимного входа как запасной вариант.");
                                 try {
                                     await signInAnonymously(auth);
@@ -492,7 +564,6 @@
                                     }
                                 } catch (anonAuthError) {
                                     console.error("initFirebase: Критическая ошибка: Анонимный вход также не удался:", anonAuthError);
-                                    // Если даже анонимный вход не удался, генерируем временный ID
                                     determinedUserId = 'fallback_anon_' + Math.random().toString(36).substring(2, 15);
                                     console.warn("initFirebase: Не удалось получить надежный UID, используется временный ID:", determinedUserId);
                                     showMessage('Внимание: Не удалось подключиться к профилю. Данные могут не сохраняться.');
@@ -556,13 +627,10 @@
                                         <i class="fas fa-times mr-1"></i> Закрыть
                                     </button>
                                 </div>
-                                <!-- Убрана синяя кнопка "Добавить" -->
                             </div>
                             <div class="flex items-center justify-start mb-4">
-                                <!-- --- ИЗМЕНЕНИЕ: Добавлен класс .font-tektur и изменен размер шрифта --- -->
                                 <h1 class="text-3xl font-bold uppercase mr-4 font-tektur">DragonDrop</h1>
-                                <!-- --- ИЗМЕНЕНИЕ: Уменьшен размер логотипа (h-32 -> h-16) --- -->
-                                <img src="https://i.ibb.co/SwBSwcn8/IMG-6383-edited-free-carve-photos.png" alt="DragonDrop Logo" class="h-16 w-auto">
+                                <img src="https://i.ibb.co/Jb3yTqM/IMG-6383-edited-free-carve-photos.png" alt="DragonDrop Logo" class="h-16 w-auto">
                             </div>
                             <div class="relative mb-4">
                                 <input type="text" id="search-input" placeholder="Найти товар" class="w-full p-3 pl-10 rounded-xl bg-gray-100 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
@@ -666,13 +734,11 @@
                     break;
 
                 case 'friends':
-                    // STEP 1: Ensure Firebase is ready and we have a currentUserId
-                    // Если Firebase не готов ИЛИ currentUserId не определен, пытаемся инициализировать
                     if (!isFirebaseReady || !currentUserId) {
                         showLoading('Инициализация пользователя...');
                         try {
-                            await initFirebase(); // Повторная попытка инициализации
-                            if (!currentUserId) { // Если UID по-прежнему не определен после повторной инициализации
+                            await initFirebase(); 
+                            if (!currentUserId) { 
                                 console.error("renderPage('friends'): currentUserId не определен после initFirebase.");
                                 content = `
                                     <div class="p-4 bg-white rounded-b-xl shadow-sm">
@@ -699,19 +765,17 @@
                                     </div>
                                 `;
                                 hideLoading();
-                                break; // Выходим из switch, так как пользователь не определен
+                                break;
                             }
                         } catch (e) {
                             console.error("renderPage('friends'): Ошибка при повторной инициализации Firebase:", e);
                             showMessage("Ошибка инициализации. Попробуйте перезагрузить.");
                             hideLoading();
-                            break; // Выходим из switch
+                            break;
                         } finally {
-                            // hideLoading(); // Скрываем загрузку даже при ошибке
                         }
                     }
 
-                    // STEP 2: Теперь, когда currentUserId гарантирован, пытаемся загрузить/создать профиль
                     if (!currentUserProfile) {
                         showLoading('Загрузка профиля...');
                         try {
@@ -724,7 +788,6 @@
                         }
                     }
 
-                    // STEP 3: Рендерим в зависимости от того, доступен ли профиль и реферальный код
                     if (!currentUserProfile || !currentUserProfile.referralCode) {
                         console.warn("renderPage('friends'): currentUserProfile или referralCode недоступен после попытки загрузки.");
                         content = `
@@ -805,11 +868,12 @@
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <div class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm">
+                                <!-- --- ИЗМЕНЕНИЕ: Обернуто в тег 'a' для ссылки --- -->
+                                <a href="https://t.me/dragondrop_poizon_bot/DragonDrop?startapp&addToHomeScreen" target="_blank" class="flex items-center bg-gray-100 p-3 rounded-xl shadow-sm cursor-pointer no-underline">
                                     <i class="fas fa-plus-circle text-blue-500 mr-3 text-lg"></i>
-                                    <span class="flex-grow">Добавить на экран «Домой»</span>
+                                    <span class="flex-grow text-gray-800">Добавить на экран «Домой»</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
-                                </div>
+                                </a>
                             </div>
 
                             <div class="space-y-4 mb-6">
@@ -818,17 +882,7 @@
                                     <span class="flex-grow">Мой профиль</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
-                                    <i class="fas fa-lock text-gray-600 mr-3 text-lg"></i>
-                                    <span class="flex-grow">Конфиденциальность</span>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
-                                    <i class="fas fa-star text-yellow-500 mr-3 text-lg"></i>
-                                    <span class="flex-grow">Статус</span>
-                                    <span class="text-gray-500 mr-2">Новичок</span>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </div>
+                                <!-- --- ИЗМЕНЕНИЕ: Пункт "Статус" удален --- -->
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
                                     <i class="fas fa-wallet text-green-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Баланс</span>
@@ -844,10 +898,11 @@
                             </div>
 
                             <div class="space-y-4 mb-6">
+                                <!-- --- ИЗМЕНЕНИЕ: Добавлен id для счетчика и используется переменная --- -->
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer" id="my-orders-link">
                                     <i class="fas fa-box text-red-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Заказы</span>
-                                    <span class="text-gray-500 mr-2">1</span>
+                                    <span id="orders-count" class="text-gray-500 mr-2">${userOrdersCount}</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
@@ -855,14 +910,11 @@
                                     <span class="flex-grow">Отзывы</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <!-- --- ИЗМЕНЕНИЕ: Добавлен id для счетчика и используется переменная --- -->
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer" data-page="favorites">
                                     <i class="fas fa-heart text-pink-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Избранное</span>
-                                    <i class="fas fa-chevron-right text-gray-400"></i>
-                                </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
-                                    <i class="fas fa-th-large text-purple-500 mr-3 text-lg"></i>
-                                    <span class="flex-grow">Подборки</span>
+                                    <span id="favorites-count" class="text-gray-500 mr-2">${userFavoritesCount}</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
@@ -870,6 +922,7 @@
                                     <span class="flex-grow">Просмотренные товары</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
+                                <!-- --- ИЗМЕНЕНИЕ: Пункты "Конфиденциальность" и "Подборки" удалены --- -->
                             </div>
                             <div class="mt-8 text-center text-gray-500">
                                 <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
@@ -960,6 +1013,9 @@
                             </button>
                         `).join('')
                         : '<p class="text-gray-500">Размеры не найдены</p>';
+                    
+                    // --- ИЗМЕНЕНИЕ: ID для иконки избранного ---
+                    const productId = btoa(product.originalLink);
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -971,7 +1027,13 @@
                             <div class="flex flex-col items-center mb-6">
                                 <img src="${imageUrl}" alt="${productName}" class="w-full max-w-xs rounded-lg shadow-md mb-4">
                                 <p class="text-sm text-green-600 font-semibold mb-2"><i class="fas fa-check-circle mr-1"></i> Оригинал</p>
-                                <h2 class="text-xl font-bold text-center mb-2">${productName}</h2>
+                                
+                                <!-- --- ИЗМЕНЕНИЕ: Добавлена иконка избранного --- -->
+                                <div class="flex items-center justify-center space-x-4 w-full max-w-xs mb-2">
+                                    <h2 class="text-xl font-bold text-center">${productName}</h2>
+                                    <i id="favorite-icon-${productId}" class="far fa-heart text-2xl text-gray-400 cursor-pointer transition-all duration-200"></i>
+                                </div>
+
                                 <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-600 mb-4">
                                     <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь</span>
                                     <span class="bg-gray-100 px-2 py-1 rounded-full">Обувь для спорта</span>
@@ -1138,10 +1200,9 @@
 
             // --- ПРИКРЕПЛЕНИЕ ОБРАБОТЧИКОВ СОБЫТИЙ ПОСЛЕ РЕНДЕРИНГА СТРАНИЦЫ ---
 
-            // Обработчики для кнопок "Назад" (back-button)
             document.querySelectorAll('.back-button').forEach(button => {
                 button.addEventListener('click', () => {
-                    renderPage(button.dataset.targetPage);
+                    renderPage(button.dataset.page);
                 });
             });
 
@@ -1158,17 +1219,15 @@
                 const copyReferralLinkBtn = document.getElementById('copy-referral-link-btn');
                 if (copyReferralLinkBtn) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    const botUsername = 'dragondrop_poizon_bot'; // Имя твоего бота
+                    const botUsername = 'dragondrop_poizon_bot';
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
 
                     copyReferralLinkBtn.addEventListener('click', async () => {
                         try {
-                            // Использование Navigator API для копирования
                             if (navigator.clipboard && navigator.clipboard.writeText) {
                                 await navigator.clipboard.writeText(referralLink);
                                 showMessage('Ссылка скопирована!');
                             } else {
-                                // Fallback для старых браузеров или окружений без Clipboard API
                                 const tempInput = document.createElement('textarea');
                                 tempInput.value = referralLink;
                                 document.body.appendChild(tempInput);
@@ -1187,7 +1246,7 @@
                 const shareReferralBtn = document.getElementById('share-referral-btn');
                 if (shareReferralBtn && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.shareViaUrl) {
                     const referralCode = currentUserProfile ? currentUserProfile.referralCode : '';
-                    const botUsername = 'dragondrop_poizon_bot'; // Имя твоего бота
+                    const botUsername = 'dragondrop_poizon_bot';
                     const referralLink = `https://t.me/${botUsername}?start=${referralCode}`;
                     const shareText = `Привет! Присоединяйся к DragonDrop и заказывай кроссовки из Poizon дешевле!\nИспользуй мой реферальный код: ${referralCode} или переходи по ссылке: ${referralLink}`;
 
@@ -1209,15 +1268,19 @@
                 const profileNameElement = document.getElementById('profile-name');
                 const profileAvatarElement = document.getElementById('profile-avatar');
                 const myOrdersLink = document.getElementById('my-orders-link');
+                const favoritesLink = document.querySelector('[data-page="favorites"]');
 
                 if (myOrdersLink) {
                     myOrdersLink.addEventListener('click', () => {
                         renderPage('myOrders');
                     });
                 }
-
-                console.log("Telegram WebApp object:", window.Telegram);
-                console.log("Telegram WebApp initDataUnsafe:", window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp.initDataUnsafe : "not available or Telegram.WebApp not initialized");
+                
+                if (favoritesLink) {
+                    favoritesLink.addEventListener('click', () => {
+                        renderPage('favorites');
+                    });
+                }
 
                 if (window.telegramUserData) {
                     const telegramUser = window.telegramUserData;
@@ -1325,6 +1388,27 @@
                         }
                     });
                 }
+                
+                // --- ИЗМЕНЕНИЕ: Логика для иконки избранного ---
+                const product = selectedProduct;
+                const productId = btoa(product.originalLink);
+                const heartIcon = document.getElementById(`favorite-icon-${productId}`);
+
+                if (heartIcon && currentUserId && db) {
+                    // Проверяем начальное состояние иконки
+                    const favoriteDocRef = firestore.doc(db, `artifacts/${appId}/users/${currentUserId}/favorites/${productId}`);
+                    firestore.getDoc(favoriteDocRef).then(docSnap => {
+                        if (docSnap.exists()) {
+                            heartIcon.classList.remove('far', 'text-gray-400');
+                            heartIcon.classList.add('fas', 'text-red-500');
+                        }
+                    });
+
+                    // Добавляем обработчик клика
+                    heartIcon.addEventListener('click', () => {
+                        toggleFavorite(currentUserId, product);
+                    });
+                }
             }
 
             if (pageName === 'orderConfirmation') {
@@ -1366,20 +1450,15 @@
 
                             await firestore.addDoc(ordersCollectionRef, orderData);
 
-                            // ----- ЛОГИКА НАЧИСЛЕНИЯ БАЛЛОВ ПО РЕФЕРАЛЬНОЙ ПРОГРАММЕ -----
                             if (currentUserProfile && !currentUserProfile.hasMadeFirstOrder) {
-                                // Это первый заказ текущего пользователя
-                                const amountForUser = 500; // Баллы для нового пользователя
+                                const amountForUser = 500;
                                 await updateUserBalance(currentUserId, amountForUser);
-                                // Обновляем флаг, чтобы второй раз баллы за первый заказ не начислялись
                                 const userDocRef = firestore.doc(db, `artifacts/${appId}/users/${currentUserId}`);
                                 await firestore.updateDoc(userDocRef, { hasMadeFirstOrder: true });
-                                currentUserProfile.hasMadeFirstOrder = true; // Обновляем локально
+                                currentUserProfile.hasMadeFirstOrder = true;
 
                                 if (currentUserProfile.invitedBy) {
-                                    // Если пользователь был приглашен, начисляем баллы пригласившему
                                     const referrerId = currentUserProfile.invitedBy;
-                                    // Находим пригласившего по его referralCode
                                     const referrerQuerySnapshot = await firestore.getDocs(
                                         firestore.query(
                                             firestore.collection(db, `artifacts/${appId}/users`),
@@ -1389,8 +1468,8 @@
 
                                     if (!referrerQuerySnapshot.empty) {
                                         const referrerDoc = referrerQuerySnapshot.docs[0];
-                                        const referrerUserId = referrerDoc.id; // Получаем UID пригласившего
-                                        const amountForReferrer = 500; // Баллы для пригласившего
+                                        const referrerUserId = referrerDoc.id;
+                                        const amountForReferrer = 500;
                                         await updateUserBalance(referrerUserId, amountForReferrer);
                                         showMessage(`Вы и ваш пригласитель получили по ${amountForReferrer} ₽!`);
                                     } else {
@@ -1401,10 +1480,8 @@
                                     showMessage(`Вы получили ${amountForUser} ₽ за первый заказ!`);
                                 }
                             } else {
-                                // Если это не первый заказ, просто уведомляем об оформлении
                                 showMessage('Заказ успешно оформлен!');
                             }
-                            // ----- КОНЕЦ ЛОГИКИ РЕФЕРАЛЬНОЙ ПРОГРАММЫ -----
 
                             console.log('Заказ сохранен:', orderData);
                             selectedProduct = null;
@@ -1421,8 +1498,8 @@
                 if (addPointsBtn) {
                     addPointsBtn.addEventListener('click', async () => {
                         if (currentUserId) {
-                            await updateUserBalance(currentUserId, 50); // Начислить 50 баллов
-                            renderPage('orderConfirmation'); // Перерисовать, чтобы обновить баланс
+                            await updateUserBalance(currentUserId, 50);
+                            renderPage('orderConfirmation');
                         } else {
                             showMessage('Войдите, чтобы управлять баллами.');
                         }
@@ -1434,8 +1511,8 @@
                     subtractPointsBtn.addEventListener('click', async () => {
                         if (currentUserId) {
                             if (currentUserProfile && currentUserProfile.balance >= 50) {
-                                await updateUserBalance(currentUserId, -50); // Списать 50 баллов
-                                renderPage('orderConfirmation'); // Перерисовать, чтобы обновить баланс
+                                await updateUserBalance(currentUserId, -50);
+                                renderPage('orderConfirmation');
                             } else {
                                 showMessage('Недостаточно баллов для списания.');
                             }
@@ -1532,18 +1609,15 @@
             }
         }
 
-        // Добавляем обработчики событий для СТАТИЧЕСКИХ кнопок нижней навигации
         document.querySelectorAll('.bottom-nav-item').forEach(button => {
             button.addEventListener('click', () => {
                 renderPage(button.dataset.page);
             });
         });
 
-        // Инициализация приложения после загрузки DOM и Firebase
         document.addEventListener('DOMContentLoaded', async () => {
             showLoading('Загрузка приложения...');
             try {
-                // Инициализируем Firebase и ждем, пока currentUserId будет определен
                 await initFirebase();
 
                 if (!currentUserId) {
@@ -1554,13 +1628,15 @@
                 }
 
                 let invitedByCode = null;
-                // Проверяем initDataUnsafe здесь, чтобы получить start_param, если он есть
                 if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
                     invitedByCode = window.Telegram.WebApp.initDataUnsafe.start_param;
                     console.log("DOMContentLoaded: Получен start_param:", invitedByCode);
                 }
 
                 await getUserProfile(currentUserId, invitedByCode);
+
+                // --- ИЗМЕНЕНИЕ: Запускаем слушатели счетчиков ---
+                listenToUserCounts(currentUserId);
 
                 hideLoading();
                 renderPage('home');
