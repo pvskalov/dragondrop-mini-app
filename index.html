@@ -251,17 +251,16 @@
             }
         }
 
-        // --- ИЗМЕНЕНИЕ: api.js функции теперь симулируются прямо здесь ---
+        // --- api.js функции теперь симулируются прямо здесь ---
         
         async function fetchPoizonProduct(link) {
             showLoading('Собираем данные (симуляция)...');
             console.log(`Симуляция запроса на информацию о товаре Poizon: ${link}`);
 
             // Возвращаем тестовые данные, чтобы не зависеть от бэкенда.
-            // Можешь менять эти данные для своих тестов.
             const productData = {
-                name: 'Nike Dunk Low "Panda"', // Более реалистичное название для тестов
-                imageUrl: 'https://i.ibb.co/CbcGk04/sneakers.png', // Реальная картинка для наглядности
+                name: 'Nike Dunk Low "Panda"',
+                imageUrl: 'https://i.ibb.co/CbcGk04/sneakers.png',
                 priceYuan: 550,
                 availableSizes: ['38', '39', '40', '41', '42', '43', '44'],
                 estimatedPriceRub: 10924,
@@ -272,7 +271,6 @@
             await new Promise(resolve => setTimeout(resolve, 500)); 
 
             hideLoading();
-            // Возвращаем данные так, как будто получили их с сервера
             return productData;
         }
 
@@ -280,7 +278,6 @@
             showLoading('Отслеживаем посылку (симуляция)...');
             console.log(`Симуляция запроса на отслеживание для номера: ${trackingNumber}`);
 
-            // Возвращаем тестовые данные для отслеживания
             const trackingInfo = {
                 number: trackingNumber,
                 status: 'В пути (симуляция)',
@@ -292,7 +289,6 @@
                 ]
             };
             
-            // Имитируем небольшую задержку
             await new Promise(resolve => setTimeout(resolve, 500));
             
             hideLoading();
@@ -374,14 +370,12 @@
             }
         }
         
-        // --- ИЗМЕНЕНИЕ: Новая функция для работы с избранным ---
         async function toggleFavorite(userId, product) {
             if (!userId || !db || !product || !product.originalLink) {
                 showMessage('Ошибка: Не удалось добавить в избранное. Пользователь или товар не определены.');
                 console.error('toggleFavorite aborting:', { userId, db, product });
                 return;
             }
-            // Используем btoa для создания валидного ID документа из URL
             const productId = btoa(product.originalLink);
             const favoriteDocRef = firestore.doc(db, `artifacts/${appId}/users/${userId}/favorites/${productId}`);
             const heartIcon = document.getElementById(`favorite-icon-${productId}`);
@@ -389,7 +383,6 @@
             try {
                 const docSnap = await firestore.getDoc(favoriteDocRef);
                 if (docSnap.exists()) {
-                    // Товар в избранном, удаляем
                     await firestore.deleteDoc(favoriteDocRef);
                     showMessage('Удалено из избранного');
                     if (heartIcon) {
@@ -397,7 +390,6 @@
                         heartIcon.classList.add('far', 'text-gray-400');
                     }
                 } else {
-                    // Товара нет в избранном, добавляем
                     const favoriteData = {
                         name: product.name,
                         imageUrl: product.imageUrl,
@@ -419,11 +411,9 @@
             }
         }
 
-        // --- ИЗМЕНЕНИЕ: Новая функция для отслеживания счетчиков ---
         function listenToUserCounts(userId) {
             if (!userId || !db) return;
 
-            // Слушатель для счетчика заказов
             const ordersCollectionRef = firestore.collection(db, `artifacts/${appId}/users/${userId}/orders`);
             firestore.onSnapshot(ordersCollectionRef, (snapshot) => {
                 userOrdersCount = snapshot.size;
@@ -437,7 +427,6 @@
                 console.error("Ошибка отслеживания счетчика заказов:", error);
             });
 
-            // Слушатель для счетчика избранного
             const favoritesCollectionRef = firestore.collection(db, `artifacts/${appId}/users/${userId}/favorites`);
             firestore.onSnapshot(favoritesCollectionRef, (snapshot) => {
                 userFavoritesCount = snapshot.size;
@@ -827,18 +816,18 @@
                             </div>
 
                             <div class="space-y-4 mb-6">
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
                                     <i class="fas fa-user text-red-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Мой профиль</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
                                     <i class="fas fa-wallet text-green-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Баланс</span>
                                     <span class="text-gray-500 mr-2">${userBalance} ₽</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
                                     <i class="fas fa-user-plus text-blue-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Пригласить друга</span>
                                     <span class="text-gray-500 mr-2">+500 ₽</span>
@@ -853,7 +842,7 @@
                                     <span id="orders-count" class="text-gray-500 mr-2">${userOrdersCount}</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
                                     <i class="fas fa-comment-alt text-orange-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Отзывы</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
@@ -864,12 +853,43 @@
                                     <span id="favorites-count" class="text-gray-500 mr-2">${userFavoritesCount}</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
-                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
                                     <i class="fas fa-eye text-blue-500 mr-3 text-lg"></i>
                                     <span class="flex-grow">Просмотренные товары</span>
                                     <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
+                                    <i class="fas fa-address-card text-purple-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Данные доставки</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
                                 </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
+                                    <i class="fas fa-truck text-orange-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Отслеживание посылки</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
+                                    <i class="fas fa-bell text-yellow-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Уведомления</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 mb-6">
+                                 <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
+                                    <i class="fab fa-telegram-plane text-blue-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Комьюнити DragonDrop</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center bg-white p-3 rounded-xl shadow-sm cursor-pointer">
+                                    <i class="fas fa-life-ring text-red-500 mr-3 text-lg"></i>
+                                    <span class="flex-grow">Поддержка</span>
+                                    <i class="fas fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
                             <div class="mt-8 text-center text-gray-500">
                                 <p>Информация профиля и настройки будут загружаться с бэкенда.</p>
                             </div>
@@ -960,8 +980,7 @@
                         `).join('')
                         : '<p class="text-gray-500">Размеры не найдены</p>';
                     
-                    // --- ИЗМЕНЕНИЕ: ID для иконки избранного ---
-                    const productId = btoa(product.originalLink || Date.now().toString()); // Добавил Date.now() на случай пустой ссылки
+                    const productId = btoa(product.originalLink || Date.now().toString());
 
                     content = `
                         <div class="p-4 bg-white rounded-b-xl shadow-sm flex flex-col min-h-[calc(100vh-4rem)]">
@@ -1304,7 +1323,7 @@
             if (pageName === 'calculateCostProductDetails') {
                 const sizeSelectionDiv = document.getElementById('size-selection');
                 if (sizeSelectionDiv && selectedProduct && selectedProduct.availableSizes) {
-                    sizeSelectionDiv.innerHTML = ''; // Очищаем, чтобы избежать дублирования
+                    sizeSelectionDiv.innerHTML = ''; 
                     selectedProduct.availableSizes.forEach(size => {
                         const button = document.createElement('button');
                         button.textContent = size;
@@ -1334,13 +1353,11 @@
                     });
                 }
                 
-                // --- ИЗМЕНЕНИЕ: Логика для иконки избранного ---
                 const product = selectedProduct;
                 const productId = btoa(product.originalLink || Date.now().toString());
                 const heartIcon = document.getElementById(`favorite-icon-${productId}`);
 
                 if (heartIcon && currentUserId && db) {
-                    // Проверяем начальное состояние иконки
                     const favoriteDocRef = firestore.doc(db, `artifacts/${appId}/users/${currentUserId}/favorites/${productId}`);
                     firestore.getDoc(favoriteDocRef).then(docSnap => {
                         if (docSnap.exists()) {
@@ -1349,7 +1366,6 @@
                         }
                     });
 
-                    // Добавляем обработчик клика
                     heartIcon.addEventListener('click', () => {
                         toggleFavorite(currentUserId, product);
                     });
@@ -1580,7 +1596,6 @@
 
                 await getUserProfile(currentUserId, invitedByCode);
 
-                // --- ИЗМЕНЕНИЕ: Запускаем слушатели счетчиков ---
                 listenToUserCounts(currentUserId);
 
                 hideLoading();
